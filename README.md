@@ -44,6 +44,12 @@ and the topic/provider ids in `lib/core/config/app_config.dart`.
 Release signing is read from `android/key.properties` (gitignored); see
 `android/key.properties.example`.
 
+Launcher icons are generated from `assets/icon/` (sources also kept as SVG):
+
+```bash
+dart run flutter_launcher_icons
+```
+
 ## License
 
 [MIT](LICENSE) — consistent with the
