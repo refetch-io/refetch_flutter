@@ -1,0 +1,111 @@
+# Publish Refetch to Google Play.
+#
+# Builds a signed App Bundle and uploads it through the Fastlane lanes in
+# `android/fastlane/`. Manual only — there is no push trigger.
+#
+# Repository secrets (Settings → Secrets and variables → Actions):
+#
+#   APP_IDENTIFIER             Android applicationId (io.appwrite.refetch)
+#   PLAY_STORE_JSON_KEY_DATA   Base64 Google Play service account JSON key
+#   ANDROID_KEYSTORE_BASE64    Base64 release keystore (.jks)
+#   ANDROID_KEYSTORE_PASSWORD  Keystore password
+#   ANDROID_KEY_ALIAS          Key alias inside the keystore
+#   ANDROID_KEY_PASSWORD       Key password
+#
+# Encode the binary secrets with `base64 -w0 file` (Linux) or
+# `base64 -i file` (macOS).
+
+name: Android Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: "Play Store track to publish to"
+        required: true
+        type: choice
+        default: internal
+        options:
+          - internal
+          - beta
+          - release
+      release_status:
+        description: "Release status (use 'draft' for the first-ever release on a draft app)"
+        required: false
+        type: choice
+        default: completed
+        options:
+          - completed
+          - draft
+          - halted
+          - inProgress
+
+jobs:
+  publish:
+    name: Build and upload to Play Store (${{ inputs.release_type }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    env:
+      # Read by android/fastlane/{Appfile,Fastfile} and the play_publisher plugin.
+      APP_IDENTIFIER: ${{ secrets.APP_IDENTIFIER }}
+      PLAY_STORE_JSON_KEY_DATA: ${{ secrets.PLAY_STORE_JSON_KEY_DATA }}
+      SUPPLY_RELEASE_STATUS: ${{ inputs.release_status }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          # Pinned to the version we develop against locally — bump in lockstep.
+          flutter-version: "3.44.6"
+          channel: stable
+          cache: true
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.2"
+          bundler-cache: true
+          working-directory: android
+
+      - name: Decode release keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          mkdir -p android/app/keystore
+          KS="$PWD/android/app/keystore/upload-keystore.jks"
+          # `tr -d '\r\n'` defends against CRLF or wrapped secrets: base64
+          # silently folds stray bytes into the output and the resulting
+          # "keystore" then trips the JDK's ASN.1 parser inside Gradle.
+          printf '%s' "$KEYSTORE_BASE64" | tr -d '\r\n' | base64 -d > "$KS"
+          if [ "$(stat -c%s "$KS")" -lt 1000 ]; then
+            echo "Decoded keystore is implausibly small — check ANDROID_KEYSTORE_BASE64." >&2
+            exit 1
+          fi
+          # Absolute storeFile: build.gradle.kts resolves a relative path
+          # against android/app, an absolute one is passed through unchanged.
+          printf "storePassword=%s\nkeyPassword=%s\nkeyAlias=%s\nstoreFile=%s\n" \
+            "$ANDROID_KEYSTORE_PASSWORD" "$ANDROID_KEY_PASSWORD" "$ANDROID_KEY_ALIAS" \
+            "$KS" > android/key.properties
+
+      - name: Install Flutter dependencies
+        run: flutter pub get
+
+      - name: Run tests
+        run: flutter test
+
+      - name: Run Fastlane ${{ inputs.release_type }}
+        working-directory: android
+        run: bundle exec fastlane ${{ inputs.release_type }}

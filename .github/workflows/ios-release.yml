@@ -1,0 +1,101 @@
+# Publish Refetch to TestFlight / the App Store.
+#
+# Builds a signed IPA and uploads it through the Fastlane lanes in
+# `ios/fastlane/`. Manual only — there is no push trigger.
+#
+# Repository secrets (Settings → Secrets and variables → Actions):
+#
+#   APP_IDENTIFIER                 iOS bundle id (io.appwrite.refetch)
+#   APPLE_ID                       Apple Developer account email
+#   TEAM_ID                        Apple Developer Team ID (10 chars)
+#   ITC_TEAM_ID                    App Store Connect team id (numeric)
+#   APP_STORE_CONNECT_KEY_ID       App Store Connect API key id
+#   APP_STORE_CONNECT_ISSUER_ID    App Store Connect issuer id
+#   APP_STORE_CONNECT_KEY_CONTENT  Base64-encoded .p8 private key
+#   MATCH_GIT_URL                  HTTPS URL of the private certificates repo
+#   MATCH_PASSWORD                 Passphrase the match repo is encrypted with
+#   MATCH_GIT_BASIC_AUTHORIZATION  Base64 of "user:personal-access-token",
+#                                  used to clone MATCH_GIT_URL over HTTPS
+#
+# `bundle exec fastlane fetch_apple_info` prints ITC_TEAM_ID locally.
+# If you prefer an SSH match URL, drop MATCH_GIT_BASIC_AUTHORIZATION and add
+# an ssh-agent step instead.
+
+name: iOS Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: "Where to send the build"
+        required: true
+        type: choice
+        default: beta
+        options:
+          - beta     # TestFlight
+          - release  # App Store review
+          - build    # signed IPA only, no upload
+
+jobs:
+  publish:
+    name: Build and upload to App Store Connect (${{ inputs.release_type }})
+    runs-on: macos-latest
+    timeout-minutes: 90
+
+    env:
+      # Read by ios/fastlane/{Appfile,Matchfile,Fastfile}.
+      APP_IDENTIFIER: ${{ secrets.APP_IDENTIFIER }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      TEAM_ID: ${{ secrets.TEAM_ID }}
+      ITC_TEAM_ID: ${{ secrets.ITC_TEAM_ID }}
+      APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+      APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      APP_STORE_CONNECT_KEY_CONTENT: ${{ secrets.APP_STORE_CONNECT_KEY_CONTENT }}
+      MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+      MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+      MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
+      # Keep fastlane's output readable in the Actions log.
+      FASTLANE_SKIP_UPDATE_CHECK: "1"
+      FASTLANE_HIDE_CHANGELOG: "1"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          # Pinned to the version we develop against locally — bump in lockstep.
+          flutter-version: "3.44.6"
+          channel: stable
+          cache: true
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.2"
+          bundler-cache: true
+          working-directory: ios
+
+      - name: Install Flutter dependencies
+        run: flutter pub get
+
+      - name: Run tests
+        run: flutter test
+
+      # Generates Runner.xcworkspace and installs the pods that fastlane's
+      # build_app then archives with the match-provisioned signing identity.
+      - name: Build Flutter iOS
+        run: flutter build ios --release --no-codesign
+
+      - name: Run Fastlane ${{ inputs.release_type }}
+        working-directory: ios
+        run: bundle exec fastlane ${{ inputs.release_type }}
+
+      - name: Upload IPA artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: refetch-ios-${{ inputs.release_type }}
+          path: build/ios/*.ipa
+          if-no-files-found: warn

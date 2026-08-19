@@ -1,0 +1,56 @@
+# Regenerate android/Gemfile.lock and ios/Gemfile.lock on a runner and commit
+# them back. Needed after any Gemfile change: Bundler runs frozen by default in
+# CI, so the release workflows fail on a stale lock.
+
+name: Refresh Gemfile.lock
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    name: Resolve ${{ matrix.platform }}/Gemfile.lock
+    runs-on: ubuntu-latest
+    strategy:
+      # Serial: both jobs commit to the same branch.
+      max-parallel: 1
+      matrix:
+        platform: [android, ios]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.2"
+          # Deliberately no bundler-cache: that is what enforces frozen mode,
+          # and resolving a new lockfile is the entire point of this job.
+          bundler-cache: false
+
+      - name: Resolve dependencies
+        working-directory: ${{ matrix.platform }}
+        run: |
+          bundle config set --local frozen false
+          bundle lock
+          # The iOS lanes run on macOS runners and developers are on macOS too,
+          # so keep the generic "ruby" platform in the lock alongside Linux.
+          bundle lock --add-platform ruby x86_64-linux
+
+      - name: Commit the updated lockfile
+        working-directory: ${{ matrix.platform }}
+        run: |
+          # Stage first: `git diff` ignores untracked files, so a missing
+          # Gemfile.lock would look unchanged and be silently dropped.
+          git add Gemfile.lock
+          if git diff --cached --quiet -- Gemfile.lock; then
+            echo "${{ matrix.platform }}/Gemfile.lock already up to date — nothing to commit."
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore(fastlane): refresh ${{ matrix.platform }}/Gemfile.lock"
+          git pull --rebase
+          git push

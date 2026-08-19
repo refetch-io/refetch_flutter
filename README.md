@@ -76,6 +76,12 @@ are committed — set them in your CI provider or a local, gitignored `.env`:
   [match](https://docs.fastlane.tools/actions/match/) certificates repo.
   `fastlane fetch_apple_info` prints your `ITC_TEAM_ID`.
 
+In CI the same lanes run from **Actions → Android Release / iOS Release**, both
+manual (`workflow_dispatch`) — pick a track and go. The secrets each one needs
+are listed at the top of `.github/workflows/*.yml`. After changing either
+`Gemfile`, run **Refresh Gemfile.lock** so the committed locks stay in sync;
+Bundler runs frozen in CI and a stale lock fails the release.
+
 ## License
 
 [MIT](LICENSE) — consistent with the
