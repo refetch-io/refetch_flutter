@@ -44,6 +44,38 @@ and the topic/provider ids in `lib/core/config/app_config.dart`.
 Release signing is read from `android/key.properties` (gitignored); see
 `android/key.properties.example`.
 
+## Releasing
+
+Both stores are driven by [fastlane](https://fastlane.tools), configured per
+platform under `android/fastlane/` and `ios/fastlane/`. Store listing text lives
+in `fastlane/metadata/` alongside the app.
+
+```bash
+cd android && bundle install     # or: cd ios && bundle install
+bundle exec fastlane lanes
+```
+
+Shared lane names: `build` (no upload), `beta` (Play open testing / TestFlight),
+`release` (Play production / App Store review), plus `upload_metadata`,
+`upload_screenshots`, `upload_listing`, `download_metadata` and `screenshots`.
+Android also has `internal` for the Play internal track.
+
+Everything project-specific is read from environment variables, so no secrets
+are committed — set them in your CI provider or a local, gitignored `.env`:
+
+- **Android** — `APP_IDENTIFIER`, plus `PLAY_STORE_JSON_KEY_PATH` or
+  `PLAY_STORE_JSON_KEY_DATA`. Release signing still comes from
+  `android/key.properties`. The build/upload logic lives in
+  [fastlane-plugin-play_publisher](https://github.com/popupbits/fastlane-plugin-play_publisher),
+  which documents the optional vars (`SUPPLY_RELEASE_STATUS=draft` for a
+  first-ever release, `SKIP_FLUTTER_BUILD=1`, …).
+- **iOS** — `APP_IDENTIFIER`, `APPLE_ID`, `TEAM_ID`, `ITC_TEAM_ID`,
+  `APP_STORE_CONNECT_KEY_ID`, `APP_STORE_CONNECT_ISSUER_ID`,
+  `APP_STORE_CONNECT_KEY_CONTENT` (base64 `.p8`), and `MATCH_GIT_URL` /
+  `MATCH_PASSWORD` for the private
+  [match](https://docs.fastlane.tools/actions/match/) certificates repo.
+  `fastlane fetch_apple_info` prints your `ITC_TEAM_ID`.
+
 ## License
 
 [MIT](LICENSE) — consistent with the

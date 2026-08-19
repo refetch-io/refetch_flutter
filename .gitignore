@@ -57,3 +57,12 @@ app.*.map.json
 
 # Local-only documentation (design specs, setup notes) — kept out of the repo.
 docs/
+
+# Fastlane — generated docs, run reports and locally installed gems.
+**/fastlane/README.md
+**/fastlane/report.xml
+**/fastlane/Preview.html
+**/fastlane/test_output/
+**/.bundle/
+android/vendor/
+ios/vendor/
