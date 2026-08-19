@@ -35,6 +35,10 @@ on:
           - beta     # TestFlight
           - release  # App Store review
           - build    # signed IPA only, no upload
+      build_number:
+        description: "Override the build number (TestFlight rejects a re-upload at the same one). Blank uses pubspec.yaml."
+        required: false
+        type: string
 
 jobs:
   publish:
@@ -86,7 +90,12 @@ jobs:
       # Generates Runner.xcworkspace and installs the pods that fastlane's
       # build_app then archives with the match-provisioned signing identity.
       - name: Build Flutter iOS
-        run: flutter build ios --release --no-codesign
+        run: |
+          if [ -n "${{ inputs.build_number }}" ]; then
+            flutter build ios --release --no-codesign --build-number="${{ inputs.build_number }}"
+          else
+            flutter build ios --release --no-codesign
+          fi
 
       - name: Run Fastlane ${{ inputs.release_type }}
         working-directory: ios

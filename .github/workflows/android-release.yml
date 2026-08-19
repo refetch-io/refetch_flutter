@@ -100,6 +100,23 @@ jobs:
             "$ANDROID_KEYSTORE_PASSWORD" "$ANDROID_KEY_PASSWORD" "$ANDROID_KEY_ALIAS" \
             "$KS" > android/key.properties
 
+      # Optional: android/app/build.gradle.kts only applies the FCM plugin when
+      # this file is present, so without the secret the build succeeds but
+      # ships without push notifications.
+      - name: Decode google-services.json
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.ANDROID_GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -z "$GOOGLE_SERVICES_JSON" ]; then
+            echo "::warning::ANDROID_GOOGLE_SERVICES_JSON is not set — building without FCM push."
+            exit 0
+          fi
+          printf '%s' "$GOOGLE_SERVICES_JSON" | tr -d '\r\n' | base64 -d > android/app/google-services.json
+          grep -q '"project_info"' android/app/google-services.json || {
+            echo "Decoded google-services.json does not look like a Firebase config." >&2
+            exit 1
+          }
+
       - name: Install Flutter dependencies
         run: flutter pub get
 
