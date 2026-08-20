@@ -1,0 +1,1 @@
+Initial release of Refetch: a curated tech-news feed with discussions, voting, submissions, and push notifications — for mobile and desktop.

@@ -82,6 +82,10 @@ platform :ios do
   # ------------------------------------------------------------------
   desc "Sync code signing certificates and profiles via match"
   private_lane :sync_signing do
+    # CI runners have no unlocked login keychain, so match cannot install the
+    # certificate without a UI prompt. setup_ci creates a temporary one.
+    setup_ci if is_ci
+
     load_asc_api_key
 
     match(
