@@ -21,25 +21,34 @@ class PushRegistrar {
   /// target on first use (bound to [providerId], when given) and updating it
   /// thereafter. Returns the target id, or `null` if the operation failed
   /// (e.g. no session).
+  ///
+  /// A target bound to a different provider than [providerId] is replaced
+  /// rather than updated: `updatePushTarget` can change the identifier but
+  /// never the provider, so a target created before the provider existed would
+  /// otherwise keep delivering through the wrong one forever.
   Future<String?> register(String token, {String? providerId}) async {
     if (token.isEmpty) return null;
+    final wanted = (providerId != null && providerId.isNotEmpty)
+        ? providerId
+        : null;
     try {
       final existing = await _store.read();
       if (existing != null) {
-        final target = await _account.updatePushTarget(
-          targetId: existing,
-          identifier: token,
-        );
-        return target.$id;
+        if (await _store.readProviderId() == wanted) {
+          final target = await _account.updatePushTarget(
+            targetId: existing,
+            identifier: token,
+          );
+          return target.$id;
+        }
+        await _discard(existing);
       }
       final target = await _account.createPushTarget(
         targetId: ID.unique(),
         identifier: token,
-        providerId: (providerId != null && providerId.isNotEmpty)
-            ? providerId
-            : null,
+        providerId: wanted,
       );
-      await _store.write(target.$id);
+      await _store.write(target.$id, providerId: wanted);
       return target.$id;
     } on AppwriteException {
       // A stale stored id (e.g. target deleted server-side) — drop it so the
@@ -47,6 +56,17 @@ class PushRegistrar {
       await _store.clear();
       return null;
     }
+  }
+
+  /// Deletes a target that can no longer be reused, tolerating one that is
+  /// already gone server-side.
+  Future<void> _discard(String targetId) async {
+    try {
+      await _account.deletePushTarget(targetId: targetId);
+    } on AppwriteException {
+      // Already deleted — the local id is stale either way.
+    }
+    await _store.clear();
   }
 
   /// Deletes the stored push target, if any. Safe to call when none exists.

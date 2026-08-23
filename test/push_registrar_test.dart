@@ -87,6 +87,49 @@ void main() {
     expect(await store.read(), isNull);
   });
 
+  test('a target bound to another provider is replaced, not updated', () async {
+    // What shipped in build 1: a target created before the APNS provider
+    // existed, so it carries no provider and delivers through the wrong one.
+    final store = InMemoryPushTargetStore('t-no-provider');
+    when(() => account.deletePushTarget(targetId: 't-no-provider'))
+        .thenAnswer((_) async => {});
+    when(
+      () => account.createPushTarget(
+        targetId: any(named: 'targetId'),
+        identifier: any(named: 'identifier'),
+        providerId: 'apns',
+      ),
+    ).thenAnswer((_) async => _target('t-apns'));
+
+    final registrar = PushRegistrar(account, store);
+    final id = await registrar.register('apns-token', providerId: 'apns');
+
+    expect(id, 't-apns');
+    expect(await store.read(), 't-apns');
+    expect(await store.readProviderId(), 'apns');
+    verify(() => account.deletePushTarget(targetId: 't-no-provider')).called(1);
+    verifyNever(() => account.updatePushTarget(
+          targetId: any(named: 'targetId'),
+          identifier: any(named: 'identifier'),
+        ));
+  });
+
+  test('a target on the same provider is still updated in place', () async {
+    final store = InMemoryPushTargetStore('t-fcm', 'fcm');
+    when(
+      () => account.updatePushTarget(
+        targetId: 't-fcm',
+        identifier: any(named: 'identifier'),
+      ),
+    ).thenAnswer((_) async => _target('t-fcm'));
+
+    final registrar = PushRegistrar(account, store);
+    final id = await registrar.register('refreshed', providerId: 'fcm');
+
+    expect(id, 't-fcm');
+    verifyNever(() => account.deletePushTarget(targetId: any(named: 'targetId')));
+  });
+
   test('unregister deletes the target and clears the store', () async {
     final store = InMemoryPushTargetStore('t-1');
     when(() => account.deletePushTarget(targetId: 't-1'))
