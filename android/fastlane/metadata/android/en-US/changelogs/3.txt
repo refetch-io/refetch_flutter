@@ -1,0 +1,1 @@
+Fixes notification delivery for devices that registered before push was fully configured — those devices now re-register automatically instead of silently receiving nothing.
