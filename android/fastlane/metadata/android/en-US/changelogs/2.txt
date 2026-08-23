@@ -1,0 +1,1 @@
+Push notifications now work on iOS as well as Android, so replies and the weekly digest reach you on either device. Plus the new Refetch app icon.
