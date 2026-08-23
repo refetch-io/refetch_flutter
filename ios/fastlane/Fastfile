@@ -97,6 +97,18 @@ platform :ios do
   end
 
   # ------------------------------------------------------------------
+  # Signing: create or fetch the certificate and profile, without building
+  # ------------------------------------------------------------------
+  # Run this once locally to seed the match repo — it creates the App Store
+  # distribution certificate and provisioning profile in the Apple portal,
+  # encrypts them with MATCH_PASSWORD and pushes them to MATCH_GIT_URL. CI
+  # only ever reads them back (sync_signing is readonly there).
+  desc "Create or fetch the App Store signing certificate and profile"
+  lane :certificates do
+    sync_signing
+  end
+
+  # ------------------------------------------------------------------
   # Beta: Build + upload to TestFlight
   # ------------------------------------------------------------------
   desc "Build and upload to TestFlight"

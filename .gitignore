@@ -52,6 +52,8 @@ app.*.map.json
 # Firebase config files contain project keys — each developer/CI supplies their own.
 **/google-services.json
 **/GoogleService-Info.plist
+# App Store Connect / APNs auth keys — hand these to CI as secrets instead.
+**/*.p8
 # Google Play service account keys — point fastlane at one with
 # PLAY_STORE_JSON_KEY_PATH, or hand it to CI as PLAY_STORE_JSON_KEY_DATA.
 **/*service_account*.json
