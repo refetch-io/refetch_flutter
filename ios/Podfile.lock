@@ -1,0 +1,23 @@
+PODS:
+  - Flutter (1.0.0)
+  - push (0.0.1):
+    - Flutter
+    - FlutterMacOS
+
+DEPENDENCIES:
+  - Flutter (from `Flutter`)
+  - push (from `.symlinks/plugins/push/darwin`)
+
+EXTERNAL SOURCES:
+  Flutter:
+    :path: Flutter
+  push:
+    :path: ".symlinks/plugins/push/darwin"
+
+SPEC CHECKSUMS:
+  Flutter: 71a624a5bc0c04062bf19101d501e466baf2fb47
+  push: 91373ae39c5341c6de6adefa3fda7f7287d646bf
+
+PODFILE CHECKSUM: 3ba3a73b1b12adcf321a227a745625fe0888cc82
+
+COCOAPODS: 1.16.2
