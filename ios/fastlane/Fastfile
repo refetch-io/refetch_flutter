@@ -21,8 +21,6 @@
 #   IOS_SCHEME       — Xcode scheme name (default: "Runner")
 # ---------------------------------------------------------------
 
-require "shellwords"
-
 default_platform(:ios)
 
 # ------------------------------------------------------------------
@@ -64,20 +62,10 @@ def appstore_export_options(app_id)
   }
 end
 
-# The Flutter template ships no DEVELOPMENT_TEAM, and manual signing will not
-# infer one — xcodebuild fails the archive with "Signing for 'Runner' requires
-# a development team". Passing the team and profile here keeps them out of the
-# checked-in project, so the Fastfile stays project-agnostic.
-def appstore_xcargs(app_id)
-  team = ENV["TEAM_ID"]
-  UI.user_error!("TEAM_ID env var must be set (Apple Developer Team ID)") if team.nil? || team.empty?
-
-  [
-    "DEVELOPMENT_TEAM=#{team.shellescape}",
-    "CODE_SIGN_STYLE=Manual",
-    "PROVISIONING_PROFILE_SPECIFIER=#{appstore_profile_name(app_id).shellescape}",
-    "CODE_SIGN_IDENTITY=#{'Apple Distribution'.shellescape}",
-  ].join(" ")
+def team_id_value
+  value = ENV["TEAM_ID"]
+  UI.user_error!("TEAM_ID env var must be set (Apple Developer Team ID)") if value.nil? || value.empty?
+  value
 end
 
 platform :ios do
@@ -115,6 +103,27 @@ platform :ios do
   end
 
   # ------------------------------------------------------------------
+  # Helper: Point the Runner target at the match profile
+  # ------------------------------------------------------------------
+  # The Flutter template ships no DEVELOPMENT_TEAM, so xcodebuild refuses to
+  # archive: "Signing for 'Runner' requires a development team". These settings
+  # have to be scoped to the Runner target — passing them as xcargs applies
+  # them to every pod and Swift package target too, and framework targets fail
+  # with "does not support provisioning profiles".
+  desc "Apply manual signing settings to the Runner target"
+  private_lane :configure_signing do |options|
+    update_code_signing_settings(
+      path: "Runner.xcodeproj",
+      use_automatic_signing: false,
+      team_id: team_id_value,
+      code_sign_identity: "Apple Distribution",
+      profile_name: appstore_profile_name(options[:app_id]),
+      targets: ["Runner"],
+      build_configurations: ["Release"],
+    )
+  end
+
+  # ------------------------------------------------------------------
   # Signing: create or fetch the certificate and profile, without building
   # ------------------------------------------------------------------
   # Run this once locally to seed the match repo — it creates the App Store
@@ -135,6 +144,8 @@ platform :ios do
 
     app_id = app_identifier_value
 
+    configure_signing(app_id: app_id)
+
     # Build the Flutter-generated Xcode project.
     # Workspace/scheme default to the Flutter standard ("Runner.xcworkspace"/"Runner")
     # but can be overridden via IOS_WORKSPACE / IOS_SCHEME env vars.
@@ -143,7 +154,6 @@ platform :ios do
       scheme: ios_scheme,
       export_method: "app-store",
       export_options: appstore_export_options(app_id),
-      xcargs: appstore_xcargs(app_id),
       output_directory: "../build/ios",
       output_name: ipa_output_name,
     )
@@ -162,12 +172,13 @@ platform :ios do
 
     app_id = app_identifier_value
 
+    configure_signing(app_id: app_id)
+
     build_app(
       workspace: ios_workspace,
       scheme: ios_scheme,
       export_method: "app-store",
       export_options: appstore_export_options(app_id),
-      xcargs: appstore_xcargs(app_id),
       output_directory: "../build/ios",
       output_name: ipa_output_name,
     )
@@ -236,12 +247,13 @@ platform :ios do
 
     app_id = app_identifier_value
 
+    configure_signing(app_id: app_id)
+
     build_app(
       workspace: ios_workspace,
       scheme: ios_scheme,
       export_method: "app-store",
       export_options: appstore_export_options(app_id),
-      xcargs: appstore_xcargs(app_id),
       output_directory: "../build/ios",
       output_name: ipa_output_name,
     )
