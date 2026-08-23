@@ -28,11 +28,11 @@ class AppConfig {
 
   /// Appwrite Messaging provider ids. Android registers its FCM token against
   /// the FCM provider; iOS registers its APNS token against the APNS provider —
-  /// each provider delivers directly to its platform (no FCM→APNS relay). Left
-  /// empty until the providers are created in the Appwrite console; when empty,
-  /// Appwrite picks a matching provider by the target's platform automatically.
+  /// each provider delivers directly to its platform (no FCM→APNS relay). If
+  /// either is left empty, Appwrite falls back to picking a provider by the
+  /// target's platform, which fails silently when none is configured.
   static const String fcmProviderId = '6a1bb5a3001dc2d85de3';
-  static const String apnsProviderId = '';
+  static const String apnsProviderId = '6a8a7cc54e645db3829c';
 
   /// Android notification channel used for foreground display.
   static const String androidNotificationChannelId = 'refetch_default';
