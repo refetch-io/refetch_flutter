@@ -50,43 +50,8 @@ Launcher icons are generated from `assets/icon/` (sources also kept as SVG):
 dart run flutter_launcher_icons
 ```
 
-## Releasing
-
-Both stores are driven by [fastlane](https://fastlane.tools), configured per
-platform under `android/fastlane/` and `ios/fastlane/`. Store listing text lives
-in `fastlane/metadata/` alongside the app.
-
-```bash
-cd android && bundle install     # or: cd ios && bundle install
-bundle exec fastlane lanes
-```
-
-Shared lane names: `build` (no upload), `beta` (Play open testing / TestFlight),
-`release` (Play production / App Store review), plus `upload_metadata`,
-`upload_screenshots`, `upload_listing`, `download_metadata` and `screenshots`.
-Android also has `internal` for the Play internal track.
-
-Everything project-specific is read from environment variables, so no secrets
-are committed — set them in your CI provider or a local, gitignored `.env`:
-
-- **Android** — `APP_IDENTIFIER`, plus `PLAY_STORE_JSON_KEY_PATH` or
-  `PLAY_STORE_JSON_KEY_DATA`. Release signing still comes from
-  `android/key.properties`. The build/upload logic lives in
-  [fastlane-plugin-play_publisher](https://github.com/popupbits/fastlane-plugin-play_publisher),
-  which documents the optional vars (`SUPPLY_RELEASE_STATUS=draft` for a
-  first-ever release, `SKIP_FLUTTER_BUILD=1`, …).
-- **iOS** — `APP_IDENTIFIER`, `APPLE_ID`, `TEAM_ID`, `ITC_TEAM_ID`,
-  `APP_STORE_CONNECT_KEY_ID`, `APP_STORE_CONNECT_ISSUER_ID`,
-  `APP_STORE_CONNECT_KEY_CONTENT` (base64 `.p8`), and `MATCH_GIT_URL` /
-  `MATCH_PASSWORD` for the private
-  [match](https://docs.fastlane.tools/actions/match/) certificates repo.
-  `fastlane fetch_apple_info` prints your `ITC_TEAM_ID`.
-
-In CI the same lanes run from **Actions → Android Release / iOS Release**, both
-manual (`workflow_dispatch`) — pick a track and go. The secrets each one needs
-are listed at the top of `.github/workflows/*.yml`. After changing either
-`Gemfile`, run **Refresh Gemfile.lock** so the committed locks stay in sync;
-Bundler runs frozen in CI and a stale lock fails the release.
+Releases are cut by the maintainers from **Actions → Android Release / iOS
+Release**; each workflow file documents the secrets it needs.
 
 ## License
 
