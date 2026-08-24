@@ -1,0 +1,1 @@
+Raises the minimum supported iOS version to 15, ahead of an App Store requirement.

@@ -66,7 +66,7 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           # Pinned to the version we develop against locally — bump in lockstep.
-          flutter-version: "3.44.6"
+          flutter-version: "3.47.1"
           channel: stable
           cache: true
 
