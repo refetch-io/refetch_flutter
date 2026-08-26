@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -229,7 +230,10 @@ class _ErrorState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final detail = detailForError(error);
+    // Debug builds only: the friendly message already separates "offline" from
+    // "server broke" from a real API message, so users gain nothing from an
+    // exception class name — and release notes of it read as an unfinished app.
+    final detail = kDebugMode ? detailForError(error) : null;
 
     return Center(
       child: Padding(
