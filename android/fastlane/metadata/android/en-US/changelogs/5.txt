@@ -1,0 +1,1 @@
+When the feed can't load, it now says why — whether the connection failed, the server is having trouble, or something else — instead of a single generic message.
