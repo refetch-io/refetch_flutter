@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/config/app_config.dart';
+import '../../../core/network/error_message.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../vote/data/vote_repository.dart';
 import '../../vote/presentation/vote_controller.dart';
@@ -84,6 +85,9 @@ class _FeedListState extends ConsumerState<FeedList>
       });
       _primeVotes(page);
     } catch (error) {
+      // Also logged so a failure is recoverable from device logs when someone
+      // reports it, not only from what happens to be on screen.
+      debugPrint('Feed load failed (${widget.tab.name}): $error');
       if (!mounted) return;
       setState(() {
         _error = error;
@@ -133,7 +137,7 @@ class _FeedListState extends ConsumerState<FeedList>
     }
 
     if (_error != null && _posts.isEmpty) {
-      return _ErrorState(onRetry: _refresh);
+      return _ErrorState(error: _error, onRetry: _refresh);
     }
 
     if (_posts.isEmpty) {
@@ -217,22 +221,44 @@ class _SignInPrompt extends StatelessWidget {
 }
 
 class _ErrorState extends StatelessWidget {
-  const _ErrorState({required this.onRetry});
+  const _ErrorState({required this.error, required this.onRetry});
 
+  final Object? error;
   final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final detail = detailForError(error);
+
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.error_outline, size: 48),
-          const SizedBox(height: 12),
-          const Text('Could not load the feed.'),
-          const SizedBox(height: 12),
-          OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
-        ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error_outline, size: 48),
+            const SizedBox(height: 12),
+            Text(
+              messageForError(error, fallback: 'Could not load the feed.'),
+              textAlign: TextAlign.center,
+            ),
+            if (detail != null) ...[
+              const SizedBox(height: 6),
+              // Shown so someone reporting a problem can quote something more
+              // specific than "it didn't load".
+              Text(
+                detail,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+            const SizedBox(height: 12),
+            OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
+          ],
+        ),
       ),
     );
   }
