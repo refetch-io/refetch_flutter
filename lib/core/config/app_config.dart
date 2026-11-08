@@ -17,6 +17,10 @@ class AppConfig {
   /// Public site; the base URL of the app API and of shared thread links.
   static const String apiBaseUrl = 'https://refetch.io';
 
+  /// Play package name (`applicationId` in android/app/build.gradle.kts), used
+  /// by the in-app update's "Open Play Store" fallback.
+  static const String androidApplicationId = 'io.appwrite.refetch';
+
   /// TablesDB ids, as in the web repo's `env.example`.
   static const String databaseId = '688f787e002c78bd299f';
   static const String postsTableId = '688f78a20022f61836ff';

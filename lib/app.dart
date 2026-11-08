@@ -5,6 +5,7 @@ import 'core/analytics/analytics_providers.dart';
 import 'core/push/push_providers.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
+import 'core/update/update_listener.dart';
 import 'features/auth/presentation/auth_controller.dart';
 
 /// Root widget: wires the router and themes into [MaterialApp.router], starts
@@ -57,6 +58,9 @@ class _RefetchAppState extends ConsumerState<RefetchApp> {
       darkTheme: AppTheme.dark,
       themeMode: ThemeMode.system,
       routerConfig: router,
+      scaffoldMessengerKey: rootMessengerKey,
+      // Play flexible in-app update; a no-op off Android and in debug builds.
+      builder: (context, child) => UpdateListener(child: child!),
     );
   }
 }
