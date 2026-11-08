@@ -102,7 +102,7 @@ jobs:
             --asset-type ${{ matrix.asset_type }} \
             --size-id ${{ matrix.size_id }} \
             --locale ${{ inputs.locale }} \
-            --out "$RUNNER_TEMP/job.json"
+            --out build/job.json
 
       # Each family renders into its own temporary folder first: moksha-render
       # replaces its destination wholesale, and both families share the
@@ -111,7 +111,7 @@ jobs:
         if: steps.want.outputs.run == 'true'
         uses: ./.github/actions/moksha-render
         with:
-          job: ${{ runner.temp }}/job.json
+          job: build/job.json  # relative: the render action prefixes $GITHUB_WORKSPACE
           destination: build/rendered/${{ matrix.family }}
 
       - name: Place for deliver
