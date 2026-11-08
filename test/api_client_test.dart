@@ -28,7 +28,9 @@ void main() {
       jwtService: jwt,
       httpClient: httpClient,
     );
-    when(() => account.createJWT()).thenAnswer((_) async => models.Jwt(jwt: 't'));
+    when(
+      () => account.createJWT(),
+    ).thenAnswer((_) async => models.Jwt(jwt: 't'));
   });
 
   test('clears the JWT and retries once on 401, then succeeds', () async {
@@ -55,25 +57,28 @@ void main() {
     verify(() => account.createJWT()).called(2);
   });
 
-  test('throws ApiException with the server message on non-401 errors', () async {
-    when(
-      () => httpClient.post(
-        any(),
-        headers: any(named: 'headers'),
-        body: any(named: 'body'),
-        encoding: any(named: 'encoding'),
-      ),
-    ).thenAnswer((_) async => http.Response('{"message":"nope"}', 400));
+  test(
+    'throws ApiException with the server message on non-401 errors',
+    () async {
+      when(
+        () => httpClient.post(
+          any(),
+          headers: any(named: 'headers'),
+          body: any(named: 'body'),
+          encoding: any(named: 'encoding'),
+        ),
+      ).thenAnswer((_) async => http.Response('{"message":"nope"}', 400));
 
-    await expectLater(
-      api.post('/api/vote', body: const {}),
-      throwsA(
-        isA<ApiException>()
-            .having((e) => e.statusCode, 'statusCode', 400)
-            .having((e) => e.message, 'message', 'nope'),
-      ),
-    );
-  });
+      await expectLater(
+        api.post('/api/vote', body: const {}),
+        throwsA(
+          isA<ApiException>()
+              .having((e) => e.statusCode, 'statusCode', 400)
+              .having((e) => e.message, 'message', 'nope'),
+        ),
+      );
+    },
+  );
 
   test('unauthenticated request without a session fails fast', () async {
     when(() => account.createJWT()).thenThrow(AppwriteException('no session'));
@@ -88,6 +93,50 @@ void main() {
         headers: any(named: 'headers'),
         body: any(named: 'body'),
         encoding: any(named: 'encoding'),
+      ),
+    );
+  });
+
+  test('unwraps the app API data envelope', () async {
+    when(
+      () => httpClient.post(
+        any(),
+        headers: any(named: 'headers'),
+        body: any(named: 'body'),
+        encoding: any(named: 'encoding'),
+      ),
+    ).thenAnswer(
+      (_) async => http.Response('{"data":{"vote":"up","count":4}}', 200),
+    );
+
+    expect(await api.post('/api/app/vote'), {'vote': 'up', 'count': 4});
+  });
+
+  test('reads the app API error field', () async {
+    when(
+      () => httpClient.post(
+        any(),
+        headers: any(named: 'headers'),
+        body: any(named: 'body'),
+        encoding: any(named: 'encoding'),
+      ),
+    ).thenAnswer(
+      (_) async => http.Response(
+        '{"error":"This story has already been shared.","code":"duplicate"}',
+        409,
+      ),
+    );
+
+    await expectLater(
+      api.post('/api/app/submit'),
+      throwsA(
+        isA<ApiException>()
+            .having((e) => e.statusCode, 'statusCode', 409)
+            .having(
+              (e) => e.message,
+              'message',
+              'This story has already been shared.',
+            ),
       ),
     );
   });

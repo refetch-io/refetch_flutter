@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/network/error_message.dart';
+import '../../../core/widgets/refetch_logo.dart';
 import 'auth_controller.dart';
 
 /// Email + password sign-up.
@@ -56,7 +57,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     });
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Create account')),
+      appBar: AppBar(),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 420),
@@ -67,12 +68,29 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  const Center(child: RefetchLogo(height: 56, markOnly: true)),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Join Refetch',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'The front page for builders. Free and open source.',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 28),
                   TextFormField(
                     controller: _name,
                     textCapitalization: TextCapitalization.words,
                     decoration: const InputDecoration(labelText: 'Name'),
-                    validator: (v) =>
-                        (v == null || v.trim().isEmpty) ? 'Enter your name' : null,
+                    validator: (v) => (v == null || v.trim().isEmpty)
+                        ? 'Enter your name'
+                        : null,
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
@@ -80,8 +98,9 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                     keyboardType: TextInputType.emailAddress,
                     autofillHints: const [AutofillHints.email],
                     decoration: const InputDecoration(labelText: 'Email'),
-                    validator: (v) =>
-                        (v == null || !v.contains('@')) ? 'Enter a valid email' : null,
+                    validator: (v) => (v == null || !v.contains('@'))
+                        ? 'Enter a valid email'
+                        : null,
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
@@ -93,8 +112,9 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                       helperText: 'At least 8 characters',
                     ),
                     onFieldSubmitted: (_) => _submit(),
-                    validator: (v) =>
-                        (v == null || v.length < 8) ? 'At least 8 characters' : null,
+                    validator: (v) => (v == null || v.length < 8)
+                        ? 'At least 8 characters'
+                        : null,
                   ),
                   const SizedBox(height: 24),
                   FilledButton(

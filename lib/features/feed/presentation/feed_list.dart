@@ -2,11 +2,17 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../../../core/analytics/analytics_providers.dart';
+import '../../../core/analytics/analytics_service.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/network/error_message.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/empty_state.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../vote/data/vote_repository.dart';
+import '../../vote/domain/vote_state.dart';
 import '../../vote/presentation/vote_controller.dart';
 import '../data/feed_repository.dart';
 import '../domain/post.dart';
@@ -75,6 +81,17 @@ class _FeedListState extends ConsumerState<FeedList>
             widget.tab,
             limit: AppConfig.feedPageSize,
             offset: _offset,
+            userId: ref.read(currentUserProvider)?.id,
+          );
+      ref
+          .read(analyticsProvider)
+          .track(
+            AnalyticsEvents.feedLoaded,
+            props: {
+              'tab': widget.tab.analyticsName,
+              'page': _offset ~/ AppConfig.feedPageSize + 1,
+              'count': page.length,
+            },
           );
       if (!mounted) return;
       setState(() {
@@ -89,6 +106,16 @@ class _FeedListState extends ConsumerState<FeedList>
       // Also logged so a failure is recoverable from device logs when someone
       // reports it, not only from what happens to be on screen.
       debugPrint('Feed load failed (${widget.tab.name}): $error');
+      ref
+          .read(analyticsProvider)
+          .track(
+            AnalyticsEvents.feedLoadFailed,
+            props: {
+              'tab': widget.tab.analyticsName,
+              'page': _offset ~/ AppConfig.feedPageSize + 1,
+              'reason': errorKind(error),
+            },
+          );
       if (!mounted) return;
       setState(() {
         _error = error;
@@ -108,7 +135,11 @@ class _FeedListState extends ConsumerState<FeedList>
       ];
       final votes = await ref.read(voteRepositoryProvider).batch(resources);
       if (!mounted) return;
-      ref.read(voteControllerProvider.notifier).prime(votes);
+      ref.read(voteControllerProvider.notifier).prime({
+        for (final p in page)
+          if (votes[p.id] != null)
+            p.id: VoteState(count: p.count, currentVote: votes[p.id]),
+      });
     } catch (_) {
       // Vote priming is best-effort; arrows fall back to default state.
     }
@@ -130,7 +161,15 @@ class _FeedListState extends ConsumerState<FeedList>
     super.build(context);
 
     if (widget.tab.requiresAuth && ref.watch(currentUserProvider) == null) {
-      return _SignInPrompt(onSignIn: () => context.push('/signin'));
+      return EmptyState(
+        icon: LucideIcons.lock,
+        title: 'Your stories live here',
+        message: 'Sign in to see the stories you have shared.',
+        action: FilledButton(
+          onPressed: () => context.push('/signin'),
+          child: const Text('Sign in'),
+        ),
+      );
     }
 
     if (!_initialLoadDone && _loading) {
@@ -144,26 +183,73 @@ class _FeedListState extends ConsumerState<FeedList>
     if (_posts.isEmpty) {
       return RefreshIndicator(
         onRefresh: _refresh,
-        child: ListView(
-          children: const [
-            SizedBox(height: 200),
-            Center(child: Text('Nothing here yet.')),
-          ],
+        child: LayoutBuilder(
+          builder: (context, constraints) => SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: SizedBox(
+              height: constraints.maxHeight,
+              child: widget.tab == FeedTab.mines
+                  ? EmptyState(
+                      icon: LucideIcons.squarePen,
+                      title: 'Nothing shared yet',
+                      message: 'Stories you submit will show up here.',
+                      action: FilledButton(
+                        onPressed: () => context.push('/submit'),
+                        child: const Text('Submit a story'),
+                      ),
+                    )
+                  : const EmptyState(
+                      icon: LucideIcons.newspaper,
+                      title: 'No stories right now',
+                      message: 'Pull down to check again in a bit.',
+                    ),
+            ),
+          ),
         ),
       );
     }
 
+    final ranked = widget.tab == FeedTab.top || widget.tab == FeedTab.show;
+    final c = context.colors;
     return RefreshIndicator(
       onRefresh: _refresh,
-      child: ListView.separated(
+      child: ListView.builder(
         controller: _scrollController,
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
         itemCount: _posts.length + 1,
-        separatorBuilder: (_, _) => const Divider(height: 1),
         itemBuilder: (context, index) {
           if (index >= _posts.length) {
             return _FooterLoader(loading: _loading, hasMore: _hasMore);
           }
-          return PostCard(post: _posts[index]);
+          // One rounded card for the whole list, with hairlines between rows
+          // (refetch.io's inset grouped list).
+          final first = index == 0;
+          final last = index == _posts.length - 1;
+          const r = Radius.circular(AppTheme.cardRadius);
+          return Container(
+            decoration: BoxDecoration(
+              color: c.surface,
+              borderRadius: BorderRadius.vertical(
+                top: first ? r : Radius.zero,
+                bottom: last ? r : Radius.zero,
+              ),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              children: [
+                PostCard(
+                  post: _posts[index],
+                  rank: ranked ? index + 1 : null,
+                  source: 'feed_${widget.tab.analyticsName}',
+                ),
+                if (!last)
+                  Padding(
+                    padding: EdgeInsets.only(left: ranked ? 70 : 46),
+                    child: const Divider(height: 0.5),
+                  ),
+              ],
+            ),
+          );
         },
       ),
     );
@@ -186,38 +272,16 @@ class _FooterLoader extends StatelessWidget {
     }
     if (!hasMore) {
       return Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Center(
           child: Text(
-            "You've reached the end.",
-            style: Theme.of(context).textTheme.bodySmall,
+            "You're all caught up.",
+            style: Theme.of(context).textTheme.labelSmall,
           ),
         ),
       );
     }
     return const SizedBox(height: 48);
-  }
-}
-
-class _SignInPrompt extends StatelessWidget {
-  const _SignInPrompt({required this.onSignIn});
-
-  final VoidCallback onSignIn;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.lock_outline, size: 48),
-          const SizedBox(height: 12),
-          const Text('Sign in to see your posts.'),
-          const SizedBox(height: 12),
-          FilledButton(onPressed: onSignIn, child: const Text('Sign in')),
-        ],
-      ),
-    );
   }
 }
 
@@ -229,40 +293,20 @@ class _ErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    // Debug builds only: the friendly message already separates "offline" from
-    // "server broke" from a real API message, so users gain nothing from an
-    // exception class name — and release notes of it read as an unfinished app.
-    final detail = kDebugMode ? detailForError(error) : null;
-
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.error_outline, size: 48),
-            const SizedBox(height: 12),
-            Text(
-              messageForError(error, fallback: 'Could not load the feed.'),
-              textAlign: TextAlign.center,
-            ),
-            if (detail != null) ...[
-              const SizedBox(height: 6),
-              // Shown so someone reporting a problem can quote something more
-              // specific than "it didn't load".
-              Text(
-                detail,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-            const SizedBox(height: 12),
-            OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
-          ],
-        ),
+    final kind = errorKind(error);
+    return EmptyState(
+      icon: kind == 'network' ? LucideIcons.wifiOff : LucideIcons.circleAlert,
+      title: kind == 'network' ? "You're offline" : "Couldn't load stories",
+      message: messageForError(
+        error,
+        fallback: 'Something went wrong. Please try again.',
+      ),
+      // Debug builds only: the friendly message already separates "offline"
+      // from "server broke"; users gain nothing from an exception name.
+      detail: kDebugMode ? detailForError(error) : null,
+      action: OutlinedButton(
+        onPressed: onRetry,
+        child: const Text('Try again'),
       ),
     );
   }

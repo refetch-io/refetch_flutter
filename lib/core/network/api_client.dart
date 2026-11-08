@@ -7,10 +7,12 @@ import '../auth/jwt_service.dart';
 import '../config/app_config.dart';
 import 'api_exception.dart';
 
-/// Thin wrapper around [http.Client] for the refetch.io REST API.
+/// Thin wrapper around [http.Client] for the refetch.io app API (`/api/app/*`,
+/// see the web repo's `docs/APP_API.md`).
 ///
-/// Handles JSON encoding/decoding, error mapping to [ApiException], and
-/// injecting the cached Appwrite JWT as a Bearer token on authenticated calls.
+/// Handles JSON encoding/decoding, unwrapping the `{ "data": … }` envelope,
+/// error mapping to [ApiException], and injecting the cached Appwrite JWT as a
+/// Bearer token on authenticated calls.
 class ApiClient {
   ApiClient({
     required this.baseUrl,
@@ -28,7 +30,10 @@ class ApiClient {
     bool auth = false,
   }) async {
     final uri = Uri.parse('$baseUrl$path').replace(queryParameters: query);
-    return _send(auth, () async => _http.get(uri, headers: await _headers(auth)));
+    return _send(
+      auth,
+      () async => _http.get(uri, headers: await _headers(auth)),
+    );
   }
 
   Future<dynamic> post(String path, {Object? body, bool auth = true}) async {
@@ -99,7 +104,11 @@ class ApiClient {
     }
 
     final ok = response.statusCode >= 200 && response.statusCode < 300;
-    if (ok) return decoded;
+    if (ok) {
+      return decoded is Map && decoded.containsKey('data')
+          ? decoded['data']
+          : decoded;
+    }
 
     final message = decoded is Map
         ? (decoded['message'] ?? decoded['error'] ?? 'Request failed')

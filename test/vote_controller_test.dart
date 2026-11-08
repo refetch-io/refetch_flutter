@@ -23,7 +23,7 @@ class _FakeVoteRepository implements VoteRepository {
   }
 
   @override
-  Future<Map<String, VoteState>> batch(List<VoteResource> resources) async =>
+  Future<Map<String, String>> batch(List<VoteResource> resources) async =>
       const {};
 }
 

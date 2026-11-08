@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'core/analytics/analytics_providers.dart';
 import 'core/push/push_providers.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/presentation/auth_controller.dart';
 
-/// Root widget: wires the router and themes into [MaterialApp.router], and
-/// drives push-notification setup off authentication state.
+/// Root widget: wires the router and themes into [MaterialApp.router], starts
+/// analytics, and drives push-notification setup off authentication state.
 class RefetchApp extends ConsumerStatefulWidget {
   const RefetchApp({super.key});
 
@@ -19,6 +20,10 @@ class _RefetchAppState extends ConsumerState<RefetchApp> {
   @override
   void initState() {
     super.initState();
+    // Analytics: start the lifecycle events, then apply the saved choice
+    // (nothing is sent until it has been read).
+    ref.read(analyticsProvider).start();
+    ref.read(analyticsConsentProvider);
     // Initialize push handling after first frame so the router exists.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final router = ref.read(routerProvider);

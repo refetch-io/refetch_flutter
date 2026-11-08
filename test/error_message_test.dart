@@ -28,15 +28,15 @@ void main() {
   });
 
   test('uses fallback for unknown errors', () {
-    expect(
-      messageForError(Exception('x'), fallback: 'Nope'),
-      'Nope',
-    );
+    expect(messageForError(Exception('x'), fallback: 'Nope'), 'Nope');
     expect(messageForError(null, fallback: 'Nope'), 'Nope');
   });
 
   test('uses fallback when ApiException message is blank', () {
-    expect(messageForError(const ApiException(400, '   '), fallback: 'Oops'), 'Oops');
+    expect(
+      messageForError(const ApiException(400, '   '), fallback: 'Oops'),
+      'Oops',
+    );
   });
 
   test('a blank 5xx body still explains itself rather than falling back', () {
@@ -76,5 +76,41 @@ void main() {
     const error = ApiException(422, 'That URL was already submitted.');
     expect(messageForError(error), 'That URL was already submitted.');
     expect(detailForError(error), 'HTTP 422');
+  });
+
+  group('Appwrite read failures', () {
+    final offline = AppwriteException(
+      'ClientException with SocketException: Failed host lookup: '
+      "'fra.cloud.appwrite.io' (OS Error: No address associated with hostname, errno = 7), "
+      'uri=https://fra.cloud.appwrite.io/v1/tablesdb/x',
+    );
+
+    test('a transport failure reads as offline, not as socket text', () {
+      expect(
+        messageForError(offline),
+        "Can't reach Refetch. Check your connection and try again.",
+      );
+      expect(errorKind(offline), 'network');
+      expect(
+        detailForError(offline),
+        startsWith('SocketException: Failed host lookup'),
+      );
+    });
+
+    test('5xx reads as a server problem; 4xx keeps the message', () {
+      final server = AppwriteException('Server Error', 503, 'general_unknown');
+      final missing = AppwriteException('Row not found', 404, 'row_not_found');
+      expect(errorKind(server), 'server');
+      expect(messageForError(server), startsWith('Refetch is having trouble'));
+      expect(errorKind(missing), 'client');
+      expect(messageForError(missing), 'Row not found');
+      expect(detailForError(missing), 'Appwrite 404 row_not_found');
+    });
+
+    test('a code-less SDK error that is not transport keeps its message', () {
+      final local = AppwriteException('Missing required parameter: "rowId"');
+      expect(errorKind(local), 'client');
+      expect(messageForError(local), 'Missing required parameter: "rowId"');
+    });
   });
 }

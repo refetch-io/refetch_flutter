@@ -1,20 +1,27 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../../../core/analytics/analytics_providers.dart';
+import '../../../core/analytics/analytics_service.dart';
 import '../../../core/network/error_message.dart';
+import '../../../core/share/share_story.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/site_favicon.dart';
 import '../../auth/domain/app_user.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../feed/domain/post.dart';
+import '../../feed/presentation/post_card.dart' show openArticle;
 import '../../vote/presentation/vote_buttons.dart';
 import '../data/thread_repository.dart';
 import '../domain/comment.dart';
 import 'comment_tile.dart';
 import 'thread_controller.dart';
 
-/// Post detail with its nested comment thread and a comment composer.
+/// A story with its comment thread and a comment composer.
 class ThreadScreen extends ConsumerWidget {
   const ThreadScreen({super.key, required this.postId});
 
@@ -25,30 +32,70 @@ class ThreadScreen extends ConsumerWidget {
     final async = ref.watch(threadProvider(postId));
     final user = ref.watch(currentUserProvider);
 
+    ref.listen(threadProvider(postId), (previous, next) {
+      if (next.hasError && !next.isLoading) {
+        ref
+            .read(analyticsProvider)
+            .track(
+              AnalyticsEvents.threadLoadFailed,
+              props: {'post_id': postId, 'reason': errorKind(next.error)},
+            );
+      }
+    });
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Thread')),
+      appBar: AppBar(
+        actions: [
+          if (async.value case final thread?)
+            Builder(
+              builder: (buttonContext) => IconButton(
+                tooltip: 'Share',
+                icon: const Icon(LucideIcons.share, size: 22),
+                onPressed: () => shareStory(
+                  buttonContext,
+                  ref,
+                  thread.post,
+                  source: 'thread',
+                ),
+              ),
+            ),
+          const SizedBox(width: 4),
+        ],
+      ),
       floatingActionButton: async.hasValue
           ? FloatingActionButton.extended(
               onPressed: () => _composeComment(context, ref, user: user),
-              icon: const Icon(Icons.add_comment_outlined),
+              icon: const Icon(LucideIcons.messageCircle, size: 20),
               label: const Text('Comment'),
             )
           : null,
       body: async.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => _ThreadError(
-          message: messageForError(error, fallback: 'Failed to load thread.'),
-          onRetry: () => ref.invalidate(threadProvider(postId)),
+        error: (error, _) => EmptyState(
+          icon: errorKind(error) == 'network'
+              ? LucideIcons.wifiOff
+              : LucideIcons.circleAlert,
+          title: "Couldn't load this story",
+          message: messageForError(
+            error,
+            fallback: 'Something went wrong. Please try again.',
+          ),
+          detail: kDebugMode ? detailForError(error) : null,
+          action: OutlinedButton(
+            onPressed: () => ref.invalidate(threadProvider(postId)),
+            child: const Text('Try again'),
+          ),
         ),
         data: (thread) => RefreshIndicator(
           onRefresh: () async => ref.invalidate(threadProvider(postId)),
           child: ListView(
-            padding: const EdgeInsets.only(bottom: 96),
+            padding: const EdgeInsets.fromLTRB(12, 4, 12, 96),
             children: [
-              _PostHeader(post: thread.post),
-              const Divider(height: 1),
+              Card(child: _PostHeader(post: thread.post)),
+              const SizedBox(height: 20),
               _CommentsSection(
                 comments: thread.comments,
+                total: thread.commentCount,
                 onReply: (parent) =>
                     _composeComment(context, ref, user: user, parent: parent),
               ),
@@ -73,9 +120,8 @@ class ThreadScreen extends ConsumerWidget {
     final text = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
-      builder: (context) => _CommentComposer(
-        replyingTo: parent?.author,
-      ),
+      showDragHandle: true,
+      builder: (context) => _CommentComposer(replyingTo: parent?.author),
     );
     if (text == null || text.trim().isEmpty || !context.mounted) return;
 
@@ -83,11 +129,12 @@ class ThreadScreen extends ConsumerWidget {
     try {
       await ref
           .read(threadRepositoryProvider)
-          .addComment(
-            postId: postId,
-            text: text.trim(),
-            userName: user.displayName,
-            replyId: parent?.id,
+          .addComment(postId: postId, text: text.trim(), replyId: parent?.id);
+      ref
+          .read(analyticsProvider)
+          .track(
+            AnalyticsEvents.commentPosted,
+            props: {'post_id': postId, 'is_reply': parent != null},
           );
       ref.invalidate(threadProvider(postId));
     } catch (error) {
@@ -102,18 +149,24 @@ class ThreadScreen extends ConsumerWidget {
   }
 }
 
-class _PostHeader extends StatelessWidget {
+class _PostHeader extends ConsumerWidget {
   const _PostHeader({required this.post});
 
   final Post post;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
+    final c = context.colors;
+
+    final meta = [
+      'by ${post.author}',
+      if (post.timeAgo != null) post.timeAgo!,
+      if (post.readingTime != null) '${post.readingTime} min read',
+    ].join('  ·  ');
 
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(12, 16, 16, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -126,100 +179,133 @@ class _PostHeader extends StatelessWidget {
                 fallbackCount: post.count,
                 fallbackVote: post.currentVote,
               ),
-              const SizedBox(width: 12),
-              SiteFavicon(domain: post.link ?? post.domain, size: 32),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
-                child: Text(
-                  post.title,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (post.domain.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          children: [
+                            SiteFavicon(
+                              domain: post.link ?? post.domain,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 6),
+                            Flexible(
+                              child: Text(
+                                post.domain,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.labelMedium?.copyWith(
+                                  color: c.brandText,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    Text(post.title, style: theme.textTheme.headlineSmall),
+                    const SizedBox(height: 8),
+                    Text(meta, style: theme.textTheme.bodySmall),
+                  ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          Text(
-            'by ${post.author}'
-            '${post.timeAgo != null ? '  ·  ${post.timeAgo}' : ''}'
-            '${post.domain.isNotEmpty ? '  ·  ${post.domain}' : ''}',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: scheme.onSurfaceVariant,
-            ),
-          ),
-          if (post.tldr != null && post.tldr!.isNotEmpty) ...[
-            const SizedBox(height: 12),
+          if (post.tldr != null) ...[
+            const SizedBox(height: 16),
             Container(
-              padding: const EdgeInsets.all(12),
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: scheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(8),
+                color: c.brandTint,
+                borderRadius: BorderRadius.circular(AppTheme.controlRadius),
               ),
-              child: Text(
-                post.tldr!,
-                style: theme.textTheme.bodyMedium,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // DESIGN.md: label AI-generated content in words.
+                  Text(
+                    'Summary, generated by AI',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: c.brandText,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(post.tldr!, style: theme.textTheme.bodyMedium),
+                ],
               ),
             ),
           ],
-          if (post.description != null && post.description!.isNotEmpty) ...[
-            const SizedBox(height: 12),
+          if (post.description != null && post.tldr == null) ...[
+            const SizedBox(height: 16),
             Text(post.description!, style: theme.textTheme.bodyMedium),
           ],
           if (post.link != null) ...[
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: () => _openLink(context, post.link!),
-              icon: const Icon(Icons.open_in_new, size: 18),
-              label: const Text('Open link'),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: () =>
+                    openArticle(context, ref, post, source: 'thread'),
+                icon: const Icon(LucideIcons.externalLink, size: 18),
+                label: const Text('Read article'),
+              ),
             ),
           ],
         ],
       ),
     );
   }
-
-  Future<void> _openLink(BuildContext context, String url) async {
-    final uri = Uri.tryParse(url);
-    final messenger = ScaffoldMessenger.of(context);
-    if (uri == null ||
-        !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Could not open the link.')),
-      );
-    }
-  }
 }
 
 class _CommentsSection extends StatelessWidget {
-  const _CommentsSection({required this.comments, required this.onReply});
+  const _CommentsSection({
+    required this.comments,
+    required this.total,
+    required this.onReply,
+  });
 
   final List<Comment> comments;
+  final int total;
   final void Function(Comment parent) onReply;
 
   @override
   Widget build(BuildContext context) {
     if (comments.isEmpty) {
       return const Padding(
-        padding: EdgeInsets.all(32),
-        child: Center(child: Text('No comments yet. Be the first!')),
+        padding: EdgeInsets.only(top: 24),
+        child: EmptyState(
+          icon: LucideIcons.messagesSquare,
+          title: 'No comments yet',
+          message: 'Start the conversation.',
+        ),
       );
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
           child: Text(
-            '${comments.length} ${comments.length == 1 ? 'comment' : 'comments'}',
-            style: Theme.of(context).textTheme.titleSmall,
+            '$total ${total == 1 ? 'comment' : 'comments'}',
+            style: Theme.of(context).textTheme.titleLarge,
           ),
         ),
-        for (final comment in comments)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: CommentTile(comment: comment, onReply: onReply),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (final comment in comments)
+                  CommentTile(comment: comment, onReply: onReply),
+              ],
+            ),
           ),
+        ),
       ],
     );
   }
@@ -247,7 +333,7 @@ class _CommentComposerState extends State<_CommentComposer> {
   Widget build(BuildContext context) {
     final viewInsets = MediaQuery.of(context).viewInsets.bottom;
     return Padding(
-      padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + viewInsets),
+      padding: EdgeInsets.fromLTRB(16, 0, 16, 16 + viewInsets),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -256,7 +342,7 @@ class _CommentComposerState extends State<_CommentComposer> {
             widget.replyingTo == null
                 ? 'Add a comment'
                 : 'Reply to ${widget.replyingTo}',
-            style: Theme.of(context).textTheme.titleMedium,
+            style: Theme.of(context).textTheme.titleLarge,
           ),
           const SizedBox(height: 12),
           TextField(
@@ -264,38 +350,13 @@ class _CommentComposerState extends State<_CommentComposer> {
             autofocus: true,
             minLines: 3,
             maxLines: 6,
-            decoration: const InputDecoration(
-              hintText: 'Share your thoughts…',
-            ),
+            decoration: const InputDecoration(hintText: 'What do you think?'),
           ),
           const SizedBox(height: 12),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(_controller.text),
             child: const Text('Post'),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ThreadError extends StatelessWidget {
-  const _ThreadError({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.error_outline, size: 48),
-          const SizedBox(height: 12),
-          Text(message),
-          const SizedBox(height: 12),
-          OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
         ],
       ),
     );

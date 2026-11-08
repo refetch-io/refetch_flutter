@@ -1,7 +1,7 @@
 # Refetch — Mobile & Desktop App
 
-> Open-source alternative to YC-controlled HN, featuring curated tech news,
-> discussions, and community-driven content.
+> The front page for builders. Open-source alternative to YC-controlled HN,
+> featuring curated tech news, discussions, and community-driven content.
 
 The official **Flutter** client for [Refetch](https://refetch.io), bringing the
 feed, threads, voting, and notifications to Android, iOS, macOS, Windows, and
@@ -15,20 +15,36 @@ Linux on top of the same [Appwrite](https://appwrite.io) backend as the web app.
 - 📰 Curated feed — Top, New, Show, and Mines tabs
 - 💬 Threaded comments with replies
 - ⬆️ Voting on posts and comments
-- ✍️ Submit links or "Show" posts
+- ✍️ Share links, with a note that starts the discussion
+- 📤 Share any story's discussion to other apps
 - 🔐 Email/password accounts
 - 🔔 Push notifications — replies and an opt-in weekly digest
-- 🌗 Material 3 light/dark theming
+- 🌗 The refetch.io look, light and dark
 
 ## Architecture
 
-A **hybrid client** that reuses the existing Refetch backend: **auth** goes
-through the Appwrite Dart SDK (sessions + JWT), while **reads and mutations** go
-through the `refetch.io` REST API authenticated with that JWT. **Push** uses FCM
-on Android and APNS directly on iOS (no Firebase on iOS) via the
-[`push`](https://pub.dev/packages/push) plugin.
+A **hybrid client** on the same [Appwrite](https://appwrite.io) project as the
+web app:
+
+- **Reads** (feeds, stories, comments) come straight from Appwrite TablesDB,
+  which the public can read, with the same queries refetch.io runs.
+- **Writes and private data** (votes, comments, submissions, your own votes)
+  go through the refetch.io app API, `/api/app/*`, authenticated with a
+  short-lived Appwrite JWT. It runs the website's own server code, so rate
+  limits, counters and notifications stay in one place. See
+  [`docs/APP_API.md`](https://github.com/refetch-io/refetch/blob/main/docs/APP_API.md)
+  in the web repo.
+- **Auth** is the Appwrite Dart SDK (email/password sessions).
+- **Push** uses FCM on Android and APNS directly on iOS (no Firebase on iOS)
+  via the [`push`](https://pub.dev/packages/push) plugin.
+- **Analytics** is Appwrite Analytics, behind `AnalyticsService`
+  (`lib/core/analytics/`). Events are anonymous, carry no user id or text the
+  person wrote, and stop when the switch in Account › Privacy is off. The
+  property id is `AppConfig.analyticsPropertyId`; build with
+  `--dart-define=ANALYTICS_PROPERTY_ID=` (empty) to compile analytics out.
 
 Built with Flutter, Riverpod, go_router, `http`, and the `appwrite` Dart SDK.
+Brand values and where they came from: [`docs/BRANDING.md`](docs/BRANDING.md).
 
 ## Getting started
 
@@ -44,10 +60,13 @@ and the topic/provider ids in `lib/core/config/app_config.dart`.
 Release signing is read from `android/key.properties` (gitignored); see
 `android/key.properties.example`.
 
-Launcher icons are generated from `assets/icon/` (sources also kept as SVG):
+Launcher icons, the splash and the Play listing art are generated from the
+logo mark (see [`docs/BRANDING.md`](docs/BRANDING.md#regenerating-the-art)):
 
 ```bash
+python tool/render_brand_assets.py
 dart run flutter_launcher_icons
+dart run flutter_native_splash:create
 ```
 
 Releases are cut by the maintainers from **Actions → Android Release / iOS

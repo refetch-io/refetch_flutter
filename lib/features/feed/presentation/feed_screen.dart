@@ -1,52 +1,48 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import '../../auth/presentation/auth_controller.dart';
+import '../../../core/widgets/refetch_logo.dart';
 import '../data/feed_repository.dart';
 import 'feed_list.dart';
 
-/// Home screen: the four feed tabs (Top / New / Show / Mines) plus actions for
-/// submitting and the account.
-class FeedScreen extends ConsumerWidget {
+/// Home screen: the Refetch wordmark, the four feed tabs (Top / New / Show /
+/// Mines), and actions for submitting and the account.
+class FeedScreen extends StatelessWidget {
   const FeedScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(currentUserProvider);
-
+  Widget build(BuildContext context) {
     return DefaultTabController(
       length: FeedTab.values.length,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text(
-            'Refetch',
-            style: TextStyle(fontWeight: FontWeight.w800),
-          ),
+          titleSpacing: 16,
+          title: const RefetchLogo(height: 24),
           actions: [
             IconButton(
-              tooltip: 'Submit',
-              icon: const Icon(Icons.add_circle_outline),
+              tooltip: 'Submit a story',
+              icon: const Icon(LucideIcons.squarePen, size: 22),
               onPressed: () => context.push('/submit'),
             ),
+            // Account works signed out too: it offers sign-in and holds the
+            // analytics switch, which signed-out people need as well.
             IconButton(
-              tooltip: user == null ? 'Sign in' : 'Account',
-              icon: Icon(user == null ? Icons.login : Icons.account_circle),
-              onPressed: () => context.push(user == null ? '/signin' : '/profile'),
+              tooltip: 'Account',
+              icon: const Icon(LucideIcons.circleUserRound, size: 22),
+              onPressed: () => context.push('/profile'),
             ),
+            const SizedBox(width: 4),
           ],
           bottom: TabBar(
             isScrollable: true,
             tabAlignment: TabAlignment.start,
-            tabs: [
-              for (final tab in FeedTab.values) Tab(text: tab.label),
-            ],
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            tabs: [for (final tab in FeedTab.values) Tab(text: tab.label)],
           ),
         ),
         body: TabBarView(
-          children: [
-            for (final tab in FeedTab.values) FeedList(tab: tab),
-          ],
+          children: [for (final tab in FeedTab.values) FeedList(tab: tab)],
         ),
       ),
     );
