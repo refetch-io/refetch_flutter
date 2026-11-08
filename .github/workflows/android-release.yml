@@ -28,6 +28,9 @@ on:
         options:
           - internal
           - beta
+          # Store listing only (text, icon, feature graphic, screenshots from
+          # android/fastlane/metadata); no build is uploaded.
+          - upload_listing
           - release
       release_status:
         description: "Release status (use 'draft' for the first-ever release on a draft app)"
