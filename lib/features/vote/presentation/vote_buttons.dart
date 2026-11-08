@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../../../core/analytics/analytics_providers.dart';
+import '../../../core/analytics/analytics_service.dart';
 import '../../../core/network/error_message.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../domain/vote_state.dart';
 import 'vote_controller.dart';
@@ -32,19 +36,23 @@ class VoteButtons extends ConsumerWidget {
     final votes = ref.watch(voteControllerProvider);
     final fallback = VoteState(count: fallbackCount, currentVote: fallbackVote);
     final state = votes[resourceId] ?? fallback;
-    final scheme = Theme.of(context).colorScheme;
-    final size = compact ? 18.0 : 22.0;
-
-    Color colorFor(bool active) =>
-        active ? scheme.primary : scheme.onSurfaceVariant;
+    final c = context.colors;
+    final size = compact ? 16.0 : 20.0;
+    final countColor = state.isUp
+        ? c.up
+        : state.isDown
+        ? c.down
+        : c.labelSecondary;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         _VoteIcon(
-          icon: Icons.keyboard_arrow_up_rounded,
+          icon: LucideIcons.arrowUp,
+          tooltip: state.isUp ? 'Remove upvote' : 'Upvote',
           size: size,
-          color: colorFor(state.isUp),
+          color: state.isUp ? c.up : c.labelTertiary,
+          tint: state.isUp ? c.upTint : null,
           onTap: () => _vote(context, ref, 'up', fallback),
         ),
         Text(
@@ -52,17 +60,16 @@ class VoteButtons extends ConsumerWidget {
           style: TextStyle(
             fontSize: compact ? 12 : 13,
             fontWeight: FontWeight.w600,
-            color: state.isUp
-                ? scheme.primary
-                : state.isDown
-                ? scheme.error
-                : scheme.onSurface,
+            fontFeatures: const [FontFeature.tabularFigures()],
+            color: countColor,
           ),
         ),
         _VoteIcon(
-          icon: Icons.keyboard_arrow_down_rounded,
+          icon: LucideIcons.arrowDown,
+          tooltip: state.isDown ? 'Remove downvote' : 'Downvote',
           size: size,
-          color: state.isDown ? scheme.error : scheme.onSurfaceVariant,
+          color: state.isDown ? c.down : c.labelTertiary,
+          tint: state.isDown ? c.downTint : null,
           onTap: () => _vote(context, ref, 'down', fallback),
         ),
       ],
@@ -82,6 +89,7 @@ class VoteButtons extends ConsumerWidget {
     }
 
     final messenger = ScaffoldMessenger.of(context);
+    final analytics = ref.read(analyticsProvider);
     try {
       await ref
           .read(voteControllerProvider.notifier)
@@ -91,6 +99,10 @@ class VoteButtons extends ConsumerWidget {
             voteType: direction,
             fallback: fallback,
           );
+      analytics.track(
+        AnalyticsEvents.voteCast,
+        props: {'resource_type': resourceType, 'direction': direction},
+      );
     } catch (error) {
       messenger.showSnackBar(
         SnackBar(
@@ -106,22 +118,38 @@ class VoteButtons extends ConsumerWidget {
 class _VoteIcon extends StatelessWidget {
   const _VoteIcon({
     required this.icon,
+    required this.tooltip,
     required this.size,
     required this.color,
     required this.onTap,
+    this.tint,
   });
 
   final IconData icon;
+  final String tooltip;
   final double size;
   final Color color;
+  final Color? tint;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return InkResponse(
-      onTap: onTap,
-      radius: size,
-      child: Icon(icon, size: size + 6, color: color),
+    final box = size + 14;
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: tint ?? Colors.transparent,
+        shape: const CircleBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: SizedBox(
+            width: box,
+            height: box,
+            child: Icon(icon, size: size, color: color),
+          ),
+        ),
+      ),
     );
   }
 }

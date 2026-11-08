@@ -1,6 +1,8 @@
+import 'package:appwrite/appwrite.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/network/api_client.dart';
+import '../../../core/appwrite/appwrite_providers.dart';
+import '../../../core/config/app_config.dart';
 import '../domain/post.dart';
 
 /// The four feed views, matching the web app's tabs.
@@ -18,42 +20,93 @@ enum FeedTab {
   /// Whether this tab requires an authenticated user.
   bool get requiresAuth => this == FeedTab.mines;
 
-  /// `sortType` query value for `/api/posts` (null for the auth-gated Mines tab,
-  /// which uses a dedicated endpoint).
-  String? get sortType => switch (this) {
-    FeedTab.top => 'score',
+  /// Name used in analytics events.
+  String get analyticsName => switch (this) {
+    FeedTab.top => 'top',
     FeedTab.latest => 'new',
     FeedTab.show => 'show',
-    FeedTab.mines => null,
+    FeedTab.mines => 'mines',
   };
 }
 
-/// Reads paginated feed pages from the refetch.io REST API.
-class FeedRepository {
-  FeedRepository(this._api);
+/// Quality gates the web applies to the front page (`posts.server.ts`).
+const _maxSpamScore = 70;
+const _minRelevancyScore = 30;
+const _frontPageWindow = Duration(hours: 24);
 
-  final ApiClient _api;
+/// The TablesDB queries for one feed page, mirroring the web's `listFeed`
+/// and `listUserPosts`. Pure so it can be tested.
+List<String> feedQueries(
+  FeedTab tab, {
+  required int limit,
+  required int offset,
+  String? userId,
+  DateTime? now,
+}) {
+  final page = [
+    Query.limit(limit),
+    Query.offset(offset),
+    Query.select(Post.listFields),
+  ];
+
+  if (tab == FeedTab.mines) {
+    return [
+      Query.equal('userId', userId ?? ''),
+      Query.orderDesc(r'$createdAt'),
+      ...page,
+    ];
+  }
+
+  final since = (now ?? DateTime.now()).toUtc().subtract(_frontPageWindow);
+  return [
+    Query.greaterThan(r'$createdAt', since.toIso8601String()),
+    Query.lessThan('spamScore', _maxSpamScore),
+    Query.greaterThan('relevancyScore', _minRelevancyScore),
+    Query.equal('enhanced', true),
+    if (tab == FeedTab.show) Query.equal('type', 'show'),
+    if (tab == FeedTab.latest)
+      Query.orderDesc(r'$createdAt')
+    else ...[
+      Query.orderDesc('score'),
+      Query.orderDesc(r'$createdAt'),
+    ],
+    ...page,
+  ];
+}
+
+/// Reads feed pages straight from the Appwrite posts table (public-read).
+class FeedRepository {
+  FeedRepository(this._tables);
+
+  final TablesDB _tables;
 
   Future<List<Post>> fetch(
     FeedTab tab, {
     required int limit,
     required int offset,
+    String? userId,
   }) async {
-    final query = {'limit': '$limit', 'offset': '$offset'};
-
-    if (tab == FeedTab.mines) {
-      final data = await _api.get('/api/mines', query: query, auth: true);
-      return Post.listFromResponse(data);
-    }
-
-    final data = await _api.get(
-      '/api/posts',
-      query: {'sortType': tab.sortType!, ...query},
+    if (tab == FeedTab.mines && userId == null) return const [];
+    final result = await _tables.listRows(
+      databaseId: AppConfig.databaseId,
+      tableId: AppConfig.postsTableId,
+      queries: feedQueries(tab, limit: limit, offset: offset, userId: userId),
+      total: false,
     );
-    return Post.listFromResponse(data);
+    return [for (final row in result.rows) Post.fromRow(row.data)];
+  }
+
+  /// One story with its summary columns, for the thread screen.
+  Future<Post> get(String postId) async {
+    final row = await _tables.getRow(
+      databaseId: AppConfig.databaseId,
+      tableId: AppConfig.postsTableId,
+      rowId: postId,
+    );
+    return Post.fromRow(row.data);
   }
 }
 
 final feedRepositoryProvider = Provider<FeedRepository>((ref) {
-  return FeedRepository(ref.watch(apiClientProvider));
+  return FeedRepository(ref.watch(tablesDbProvider));
 });

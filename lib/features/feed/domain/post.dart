@@ -1,7 +1,8 @@
-import 'dart:convert';
+import '../../../core/config/app_config.dart';
+import '../../../core/format/time_ago.dart' as format;
 
-/// A feed item (a submitted link or "show" post) as returned by the refetch.io
-/// `/api/posts`, `/api/mines`, and `/api/posts/{id}` endpoints.
+/// A story (a submitted link or "show" post), read from the Appwrite posts
+/// table. Mirrors `toPost`/`toPostDetail` in the web repo's `db.server.ts`.
 class Post {
   const Post({
     required this.id,
@@ -10,7 +11,7 @@ class Post {
     required this.count,
     required this.author,
     required this.countComments,
-    this.timeAgo,
+    this.createdAt,
     this.description,
     this.tldr,
     this.userId,
@@ -22,13 +23,13 @@ class Post {
 
   final String id;
   final String title;
+
+  /// Host of [link] without `www.`, or empty for a post without a link.
   final String domain;
   final int count;
   final String author;
   final int countComments;
-
-  /// Pre-formatted "x hours ago" string from the API (field `daysAgo`).
-  final String? timeAgo;
+  final DateTime? createdAt;
   final String? description;
   final String? tldr;
   final String? userId;
@@ -38,44 +39,96 @@ class Post {
   final String? type;
   final int? readingTime;
 
-  /// `'up'`, `'down'`, or `null`. Only populated on auth-aware endpoints.
+  /// `'up'`, `'down'`, or `null`; filled in from `/api/app/votes`.
   final String? currentVote;
 
   bool get isShow => type == 'show';
 
-  factory Post.fromJson(Map<String, dynamic> json) {
+  /// "3h ago", or null when the row carried no creation time.
+  String? get timeAgo => createdAt == null ? null : format.timeAgo(createdAt!);
+
+  /// The thread on refetch.io, for sharing.
+  String get threadUrl => '${AppConfig.apiBaseUrl}/threads/$id';
+
+  /// Columns the feed selects (the web's `POST_LIST_FIELDS`).
+  static const listFields = [
+    r'$id',
+    r'$createdAt',
+    'title',
+    'description',
+    'userId',
+    'userName',
+    'count',
+    'countComments',
+    'link',
+    'type',
+    'readingTime',
+  ];
+
+  /// Builds a post from a TablesDB row's data (which includes `$id` and
+  /// `$createdAt`).
+  factory Post.fromRow(Map<String, dynamic> row, {String? currentVote}) {
+    final rawLink = row['link'];
+    final link =
+        rawLink is String &&
+            RegExp(r'^https?://', caseSensitive: false).hasMatch(rawLink)
+        ? rawLink
+        : null;
+    final userName = row['userName'];
+    final tldr = row['tldr'];
+    final readingTime = row['readingTime'];
+    final description = row['description'];
     return Post(
-      id: json['id'] as String,
-      title: (json['title'] ?? '') as String,
-      domain: (json['domain'] ?? '') as String,
-      count: _asInt(json['count']),
-      author: (json['author'] ?? 'anonymous') as String,
-      countComments: _asInt(json['countComments']),
-      timeAgo: json['daysAgo'] as String?,
-      description: json['description'] as String?,
-      tldr: json['tldr'] as String?,
-      userId: json['userId'] as String?,
-      link: json['link'] as String?,
-      type: json['type'] as String?,
-      readingTime: json['readingTime'] == null
-          ? null
-          : _asInt(json['readingTime']),
-      currentVote: json['currentVote'] as String?,
+      id: '${row[r'$id']}',
+      title: '${row['title'] ?? ''}',
+      domain: hostOf(link),
+      count: _asInt(row['count']),
+      author: userName is String && userName.isNotEmpty
+          ? userName
+          : 'Anonymous',
+      countComments: _asInt(row['countComments']),
+      createdAt: DateTime.tryParse('${row[r'$createdAt'] ?? ''}'),
+      description: description is String && description.trim().isNotEmpty
+          ? description.trim()
+          : null,
+      tldr: tldr is String && tldr.trim().isNotEmpty ? tldr.trim() : null,
+      userId: row['userId'] is String ? row['userId'] as String : null,
+      link: link,
+      type: row['type'] == 'show' ? 'show' : 'link',
+      readingTime: readingTime is num && readingTime > 0
+          ? readingTime.toInt()
+          : null,
+      currentVote: currentVote,
     );
+  }
+
+  Post withVote(String? vote) => Post(
+    id: id,
+    title: title,
+    domain: domain,
+    count: count,
+    author: author,
+    countComments: countComments,
+    createdAt: createdAt,
+    description: description,
+    tldr: tldr,
+    userId: userId,
+    link: link,
+    type: type,
+    readingTime: readingTime,
+    currentVote: vote,
+  );
+
+  /// `https://www.example.com/a` → `example.com`.
+  static String hostOf(String? url) {
+    if (url == null) return '';
+    final host = Uri.tryParse(url)?.host ?? '';
+    return host.startsWith('www.') ? host.substring(4) : host;
   }
 
   static int _asInt(dynamic value) =>
       value is num ? value.toInt() : int.tryParse('$value') ?? 0;
 
-  /// Parses a `{ "posts": [...] }` envelope (or a bare list) into [Post]s.
-  static List<Post> listFromResponse(dynamic data) {
-    final list = data is Map ? data['posts'] : data;
-    if (list is! List) return const [];
-    return list
-        .map((e) => Post.fromJson(e as Map<String, dynamic>))
-        .toList(growable: false);
-  }
-
   @override
-  String toString() => 'Post(${jsonEncode({'id': id, 'title': title})})';
+  String toString() => 'Post($id, $title)';
 }

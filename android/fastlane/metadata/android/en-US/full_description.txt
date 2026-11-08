@@ -1,15 +1,16 @@
-Refetch is a community-driven, open-source alternative to Hacker News — your daily drop of curated tech news, with signal over noise.
+Refetch is the front page for builders: an open-source alternative to YC-controlled Hacker News, with curated tech news and the discussions around it.
 
-Discover the best of technology: AI, startups, open source, security, science, and programming, surfaced from 20+ trusted sources and ranked by a transparent, community-driven algorithm.
+Stories come from trusted sources across AI, startups, open source, security, science and programming, and are ranked by a transparent algorithm you can read on GitHub. The community votes, comments and shares the rest.
 
 FEATURES
-• Curated feed — browse Top, New, and Show stories, plus your own submissions
-• Discussions — threaded comments with replies
-• Voting — upvote and downvote stories and comments
-• Submit — share a link or a "Show" post with the community
-• Notifications — replies to you and an opt-in weekly digest of top stories
-• Fast and clean, built for both mobile and desktop
+• Top, New and Show: today's front page, the latest stories, and what people are building
+• Discussions: threaded comments and replies on every story
+• Voting: upvote and downvote stories and comments
+• Share a story: post a link with a note that starts the conversation
+• Share anywhere: send a story's discussion to friends from any app
+• Notifications: replies to you, and an optional weekly digest of top stories
+• Light and dark themes, in the Refetch purple
 
-Refetch is fully open source and privacy-focused, powered by Appwrite. Free from YC control — open, transparent, and community-run.
+Refetch is free, open source and built on Appwrite. Anonymous usage analytics help us improve the app, and you can turn them off any time in Account.
 
 Learn more at https://refetch.io

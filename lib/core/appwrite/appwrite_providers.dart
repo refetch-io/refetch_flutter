@@ -14,3 +14,8 @@ final appwriteClientProvider = Provider<Client>((ref) {
 final accountProvider = Provider<Account>((ref) {
   return Account(ref.watch(appwriteClientProvider));
 });
+
+/// Appwrite [TablesDB] service — public reads of posts and comments.
+final tablesDbProvider = Provider<TablesDB>((ref) {
+  return TablesDB(ref.watch(appwriteClientProvider));
+});

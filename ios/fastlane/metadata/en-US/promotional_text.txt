@@ -1,1 +1,1 @@
-Refetch is a community-driven, open-source alternative to Hacker News — curated tech stories, discussions, and voting, with signal over noise.
+The front page for builders. Curated tech news, ranked in the open, with the discussions around it. Now in the new Refetch look.

@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
+
+import '../../../core/theme/app_theme.dart';
 
 import '../../vote/presentation/vote_buttons.dart';
 import '../domain/comment.dart';
@@ -22,7 +25,6 @@ class CommentTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
     final indent = _indentPerLevel * (depth.clamp(0, _maxIndentLevels));
 
     return Padding(
@@ -35,7 +37,10 @@ class CommentTile extends StatelessWidget {
             decoration: BoxDecoration(
               border: depth > 0
                   ? Border(
-                      left: BorderSide(color: scheme.outlineVariant, width: 2),
+                      left: BorderSide(
+                        color: context.colors.separator,
+                        width: 2,
+                      ),
                     )
                   : null,
             ),
@@ -46,6 +51,7 @@ class CommentTile extends StatelessWidget {
                   resourceId: comment.id,
                   resourceType: 'comment',
                   fallbackCount: comment.count,
+                  fallbackVote: comment.currentVote,
                   compact: true,
                 ),
                 const SizedBox(width: 8),
@@ -57,16 +63,12 @@ class CommentTile extends StatelessWidget {
                         children: [
                           Text(
                             comment.author,
-                            style: theme.textTheme.labelMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
+                            style: theme.textTheme.labelMedium,
                           ),
                           const SizedBox(width: 8),
                           Text(
                             comment.timeAgo,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: scheme.onSurfaceVariant,
-                            ),
+                            style: theme.textTheme.labelSmall,
                           ),
                         ],
                       ),
@@ -79,7 +81,7 @@ class CommentTile extends StatelessWidget {
                           minimumSize: const Size(0, 32),
                           visualDensity: VisualDensity.compact,
                         ),
-                        icon: const Icon(Icons.reply, size: 16),
+                        icon: const Icon(LucideIcons.reply, size: 15),
                         label: const Text('Reply'),
                       ),
                     ],
@@ -89,11 +91,7 @@ class CommentTile extends StatelessWidget {
             ),
           ),
           for (final reply in comment.replies)
-            CommentTile(
-              comment: reply,
-              onReply: onReply,
-              depth: depth + 1,
-            ),
+            CommentTile(comment: reply, onReply: onReply, depth: depth + 1),
         ],
       ),
     );

@@ -1,40 +1,71 @@
 name: refetch
-description: "A new Flutter project."
+description: "Refetch: the front page for builders. Open-source alternative to YC-controlled HN."
 publish_to: 'none'
-version: 0.1.0+5
+version: 0.2.0+6
 
 environment:
   sdk: ^3.12.0
 
 dependencies:
-  appwrite: ^24.2.0
+  appwrite: ^28.3.0
   flutter:
     sdk: flutter
-  flutter_local_notifications: ^21.0.0
+  flutter_local_notifications: ^22.3.1
   flutter_riverpod: ^3.3.1
+  flutter_svg: ^2.3.2
   go_router: ^17.2.3
   http: ^1.6.0
+  lucide_icons_flutter: ^4.0.2
   permission_handler: ^12.0.2
   push: ^3.3.3
+  share_plus: ^13.3.1
   shared_preferences: ^2.5.5
   url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  # Drives the store-screenshot capture (integration_test/screenshot_test.dart).
+  integration_test:
+    sdk: flutter
   flutter_launcher_icons: ^0.14.4
   flutter_lints: ^6.0.0
   mocktail: ^1.0.5
+  flutter_native_splash: ^2.4.8
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/brand/logo-mark.svg
+    - assets/brand/logo-wordmark.svg
+    - assets/fonts/Inter-OFL.txt
+    - assets/fonts/Poppins-OFL.txt
+  fonts:
+    # Body text on Android, Windows and Linux (refetch.io --font-sans; Apple
+    # platforms use the system font there, as the site does).
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-Regular.ttf
+        - asset: assets/fonts/Inter-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Inter-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Inter-Bold.ttf
+          weight: 700
+    # Titles (refetch.io --font-display, the wordmark's typeface).
+    - family: Poppins
+      fonts:
+        - asset: assets/fonts/Poppins-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Poppins-Bold.ttf
+          weight: 700
 
 flutter_launcher_icons:
   image_path: "assets/icon/icon.png"
   android: true
-  adaptive_icon_background: "#5A00FF"
+  adaptive_icon_background: "#FFFFFF"
   adaptive_icon_foreground: "assets/icon/icon_foreground.png"
-  adaptive_icon_monochrome: "assets/icon/icon_foreground.png"
+  adaptive_icon_monochrome: "assets/icon/icon_monochrome.png"
   ios: true
   remove_alpha_ios: true
   macos:
@@ -47,5 +78,19 @@ flutter_launcher_icons:
   web:
     generate: true
     image_path: "assets/icon/icon.png"
-    background_color: "#5A00FF"
-    theme_color: "#5A00FF"
+    background_color: "#F5F5F7"
+    theme_color: "#4E1CB3"
+
+# Launch screen: the logo mark on the app background (refetch.io --bg).
+# Regenerate with `dart run flutter_native_splash:create`.
+flutter_native_splash:
+  color: "#F5F5F7"
+  image: assets/brand/splash_mark.png
+  color_dark: "#0E0D13"
+  image_dark: assets/brand/splash_mark.png
+  android_12:
+    color: "#F5F5F7"
+    image: assets/brand/splash_mark.png
+    color_dark: "#0E0D13"
+    image_dark: assets/brand/splash_mark.png
+  web: false

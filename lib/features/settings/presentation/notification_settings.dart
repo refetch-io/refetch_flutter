@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../../core/analytics/analytics_providers.dart';
+import '../../../core/analytics/analytics_service.dart';
 import '../../../core/network/error_message.dart';
 import '../../../core/push/push_providers.dart';
 import '../../../core/push/push_topic.dart';
@@ -43,8 +46,9 @@ class _NotificationSettingsState extends ConsumerState<NotificationSettings> {
   }
 
   Future<void> _grantPermission() async {
-    final granted =
-        await ref.read(pushNotificationServiceProvider).requestPermission();
+    final granted = await ref
+        .read(pushNotificationServiceProvider)
+        .requestPermission();
     if (!mounted) return;
     if (!granted) {
       // Likely permanently denied — send the user to system settings.
@@ -61,6 +65,12 @@ class _NotificationSettingsState extends ConsumerState<NotificationSettings> {
     try {
       if (value && !_permissionGranted) await _grantPermission();
       await ref.read(topicSubscriptionsProvider).setEnabled(topic, value);
+      ref
+          .read(analyticsProvider)
+          .track(
+            AnalyticsEvents.settingChanged,
+            props: {'setting': 'push_${topic.topicId}', 'value': value},
+          );
       messenger
         ..hideCurrentSnackBar()
         ..showSnackBar(
@@ -112,7 +122,7 @@ class _NotificationSettingsState extends ConsumerState<NotificationSettings> {
         ),
         if (!_permissionGranted)
           ListTile(
-            leading: const Icon(Icons.notifications_off_outlined),
+            leading: const Icon(LucideIcons.bellOff),
             title: const Text('Allow notifications'),
             subtitle: const Text('Required to receive push notifications'),
             trailing: FilledButton(

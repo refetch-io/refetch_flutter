@@ -7,11 +7,26 @@
 	<false/>
 	<key>NSPrivacyTrackingDomains</key>
 	<array/>
-	<!-- NSPrivacyCollectedDataTypes is intentionally empty: it must mirror the
-	     answers given in App Store Connect > App Privacy. Fill it in there
-	     first, then mirror the result here. -->
+	<!-- NSPrivacyCollectedDataTypes must mirror the answers given in App Store
+	     Connect > App Privacy. Since 0.2.0 the app sends anonymous usage
+	     analytics (screens, feature use) to Appwrite Analytics: not linked to
+	     the account (no user id is sent), not used for tracking, and switched
+	     off from Account > Privacy. Update App Store Connect to match. -->
 	<key>NSPrivacyCollectedDataTypes</key>
-	<array/>
+	<array>
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeProductInteraction</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+			</array>
+		</dict>
+	</array>
 	<key>NSPrivacyAccessedAPITypes</key>
 	<array>
 		<dict>

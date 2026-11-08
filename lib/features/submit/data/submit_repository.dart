@@ -2,28 +2,30 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
 
-/// Submits new posts (links or "show" posts) via the refetch.io REST API.
+/// Submits stories through the app API (`/api/app/submit`). As on refetch.io,
+/// a story is a link; an optional note becomes the first comment.
 class SubmitRepository {
   SubmitRepository(this._api);
 
   final ApiClient _api;
 
-  Future<void> submit({
+  /// Returns the new story's id.
+  Future<String> submit({
     required String title,
-    required String type,
-    String? url,
-    String? description,
+    required String url,
+    String? comment,
   }) async {
-    await _api.post(
-      '/api/submit',
-      body: {
-        'title': title,
-        'type': type,
-        if (url != null && url.isNotEmpty) 'url': url,
-        if (description != null && description.isNotEmpty)
-          'description': description,
-      },
-    );
+    final data =
+        await _api.post(
+              '/api/app/submit',
+              body: {
+                'title': title,
+                'url': url,
+                if (comment != null && comment.isNotEmpty) 'comment': comment,
+              },
+            )
+            as Map<String, dynamic>;
+    return '${data['id']}';
   }
 }
 

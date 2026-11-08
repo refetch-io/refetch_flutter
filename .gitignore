@@ -62,8 +62,10 @@ app.*.map.json
 .env
 *.env
 
-# Local-only documentation (design specs, setup notes) — kept out of the repo.
-docs/
+# Local-only documentation (design specs, setup notes) — kept out of the repo,
+# except the brand sources the app's look is built from.
+docs/*
+!docs/BRANDING.md
 
 # Fastlane — generated docs, run reports and locally installed gems.
 **/fastlane/README.md

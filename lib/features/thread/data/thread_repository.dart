@@ -1,7 +1,12 @@
+import 'package:appwrite/appwrite.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/appwrite/appwrite_providers.dart';
+import '../../../core/config/app_config.dart';
 import '../../../core/network/api_client.dart';
+import '../../feed/data/feed_repository.dart';
 import '../../feed/domain/post.dart';
+import '../../vote/data/vote_repository.dart';
 import '../domain/comment.dart';
 
 /// A post together with its (nested) comment tree.
@@ -10,50 +15,83 @@ class ThreadData {
 
   final Post post;
   final List<Comment> comments;
+
+  /// Every comment, replies included.
+  int get commentCount => Comment.flatten(comments).length;
 }
 
-/// Reads a single thread and performs comment mutations against refetch.io.
+/// The most comments a thread loads (the web's `MAX_THREAD_COMMENTS`).
+const maxThreadComments = 500;
+
+/// Reads a thread from Appwrite (posts and comments are public-read) and
+/// writes comments through the app API.
 class ThreadRepository {
-  ThreadRepository(this._api);
+  ThreadRepository(this._tables, this._feed, this._api, this._votes);
 
+  final TablesDB _tables;
+  final FeedRepository _feed;
   final ApiClient _api;
+  final VoteRepository _votes;
 
-  /// Loads the post header and its nested comments concurrently.
-  Future<ThreadData> load(String postId) async {
-    final results = await Future.wait([
-      _api.get('/api/posts/$postId'),
-      _api.get('/api/comments', query: {'postId': postId}),
-    ]);
+  /// Loads the story and its comments; when [signedIn], also the viewer's
+  /// votes on them (best effort).
+  Future<ThreadData> load(String postId, {bool signedIn = false}) async {
+    var (post, list) = await (
+      _feed.get(postId),
+      _tables.listRows(
+        databaseId: AppConfig.databaseId,
+        tableId: AppConfig.commentsTableId,
+        queries: [
+          Query.equal('postId', postId),
+          Query.orderDesc(r'$createdAt'),
+          Query.limit(maxThreadComments),
+          Query.select(Comment.fields),
+        ],
+        total: false,
+      ),
+    ).wait;
+    final flat = [for (final row in list.rows) Comment.fromRow(row.data)];
 
-    final postEnvelope = results[0] as Map<String, dynamic>;
-    final post = Post.fromJson(postEnvelope['post'] as Map<String, dynamic>);
-    final comments = Comment.listFromResponse(results[1]);
+    var votes = const <String, String>{};
+    if (signedIn) {
+      try {
+        votes = await _votes.batch([
+          (id: post.id, type: 'post'),
+          for (final c in flat) (id: c.id, type: 'comment'),
+        ]);
+      } catch (_) {
+        // Arrows fall back to "not voted".
+      }
+      post = post.withVote(votes[post.id]);
+    }
 
-    return ThreadData(post: post, comments: comments);
+    return ThreadData(
+      post: post,
+      comments: Comment.buildTree(flat, votes: votes),
+    );
   }
 
   Future<void> addComment({
     required String postId,
     required String text,
-    required String userName,
     String? replyId,
   }) async {
     await _api.post(
-      '/api/comments',
-      body: {
-        'postId': postId,
-        'text': text,
-        'userName': userName,
-        'replyId': ?replyId,
-      },
+      '/api/app/comments',
+      body: {'postId': postId, 'content': text, 'replyId': ?replyId},
     );
   }
 
   Future<void> deleteComment(String commentId) async {
-    await _api.delete('/api/comments/$commentId');
+    await _api.delete('/api/app/comments/$commentId');
   }
 }
 
 final threadRepositoryProvider = Provider<ThreadRepository>((ref) {
-  return ThreadRepository(ref.watch(apiClientProvider));
+  return ThreadRepository(
+    ref.watch(tablesDbProvider),
+    ref.watch(feedRepositoryProvider),
+    ref.watch(apiClientProvider),
+    ref.watch(voteRepositoryProvider),
+  );
 });
