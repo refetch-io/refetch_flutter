@@ -72,12 +72,12 @@ jobs:
             --asset-type android-phone-screenshot \
             --size-id android-phone \
             --locale ${{ inputs.locale }} \
-            --out "$RUNNER_TEMP/job.json"
+            --out build/job.json
 
       - name: Render
         uses: ./.github/actions/moksha-render
         with:
-          job: ${{ runner.temp }}/job.json
+          job: build/job.json  # relative: the render action prefixes $GITHUB_WORKSPACE
           destination: android/fastlane/metadata/android/${{ inputs.locale }}/images/phoneScreenshots
 
       - name: Open a PR
