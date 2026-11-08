@@ -1,0 +1,48 @@
+{
+  "_comment": [
+    "Store screenshot copy and styling, in one place because every store reads",
+    "it. tool/screenshot_job.dart turns this into a moksha job; moksha renders",
+    "the finished images and checks them against each store's upload rules.",
+    "",
+    "Scene ids match the capture names integration_test/screenshot_test.dart",
+    "writes. Add a screen there and add it here.",
+    "",
+    "Background is the Refetch purple (#4E1CB3, docs/BRANDING.md); text is",
+    "white. Headlines use Poppins (the wordmark's face), subheads Inter, as on",
+    "refetch.io. These are store copy, not UI strings: write the benefit."
+  ],
+
+  "background": { "type": "solid", "id": "custom", "color": "#4E1CB3" },
+
+  "layouts": ["hero-center", "tilt-right", "float-up", "tilt-left"],
+
+  "fonts": {
+    "headline": "Poppins",
+    "subhead": "Inter"
+  },
+
+  "textColor": "#FFFFFF",
+
+  "scenes": [
+    {
+      "id": "top",
+      "headline": { "en-US": "The front page for builders" },
+      "subhead": { "en-US": "Today's best tech stories, ranked in the open" }
+    },
+    {
+      "id": "thread",
+      "headline": { "en-US": "Read the room" },
+      "subhead": { "en-US": "A quick summary, then the discussion" }
+    },
+    {
+      "id": "new",
+      "headline": { "en-US": "Fresh from the source" },
+      "subhead": { "en-US": "New stories from trusted tech sites, all day" }
+    },
+    {
+      "id": "account",
+      "headline": { "en-US": "Your data, your call" },
+      "subhead": { "en-US": "Anonymous usage stats, off with one switch" }
+    }
+  ]
+}

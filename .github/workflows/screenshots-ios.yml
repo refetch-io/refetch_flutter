@@ -1,0 +1,149 @@
+# Capture, frame and open a PR with the App Store screenshots.
+#
+# macOS, because the iOS simulator has no Linux equivalent. Ported from
+# momo-pasal; see screenshots/README.md.
+#
+# The app is universal (TARGETED_DEVICE_FAMILY = 1,2), so App Store Connect
+# wants a 6.9" iPhone set and a 13" iPad set. Each is captured on a matching
+# simulator and framed by moksha at a size App Store Connect accepts, into
+# ios/fastlane/screenshots/framed/<locale>/, which is where the fastlane
+# upload_screenshots / upload_listing lanes read from.
+
+name: Screenshots (iOS)
+
+on:
+  workflow_dispatch:
+    inputs:
+      locale:
+        description: "App Store locale"
+        type: choice
+        default: en-US
+        options:
+          - en-US
+      families:
+        description: "Which device families to regenerate"
+        type: choice
+        default: iphone+ipad
+        options:
+          - iphone+ipad
+          - iphone
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  screenshots:
+    runs-on: macos-latest
+    timeout-minutes: 90
+
+    strategy:
+      max-parallel: 1
+      fail-fast: false
+      matrix:
+        include:
+          - family: iphone
+            simulator: "iPhone 17 Pro Max"
+            asset_type: iphone-screenshot
+            size_id: "ios-6.9"
+          - family: ipad
+            simulator: "iPad Pro 13-inch (M4)"
+            asset_type: ipad-screenshot
+            size_id: "ipad-13"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Skip families that were not asked for
+        id: want
+        run: |
+          if [ "${{ matrix.family }}" = "ipad" ] && \
+             [ "${{ inputs.families }}" != "iphone+ipad" ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: subosito/flutter-action@v2
+        if: steps.want.outputs.run == 'true'
+        with:
+          flutter-version: "3.47.1"
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        if: steps.want.outputs.run == 'true'
+        run: flutter pub get
+
+      - name: Boot the simulator
+        if: steps.want.outputs.run == 'true'
+        id: sim
+        run: |
+          set -euo pipefail
+          xcrun simctl list devicetypes | grep -i -E 'iphone|ipad' || true
+          udid=$(xcrun simctl create shots "${{ matrix.simulator }}")
+          xcrun simctl boot "$udid"
+          xcrun simctl bootstatus "$udid" -b
+          echo "udid=$udid" >> "$GITHUB_OUTPUT"
+
+      - name: Capture
+        if: steps.want.outputs.run == 'true'
+        run: |
+          flutter drive \
+            --driver=test_driver/integration_test.dart \
+            --target=integration_test/screenshot_test.dart \
+            --dart-define=ANALYTICS_PROPERTY_ID= \
+            -d ${{ steps.sim.outputs.udid }}
+
+      - name: Build the moksha job
+        if: steps.want.outputs.run == 'true'
+        run: |
+          dart run tool/screenshot_job.dart \
+            --asset-type ${{ matrix.asset_type }} \
+            --size-id ${{ matrix.size_id }} \
+            --locale ${{ inputs.locale }} \
+            --out "$RUNNER_TEMP/job.json"
+
+      # Each family renders into its own temporary folder first: moksha-render
+      # replaces its destination wholesale, and both families share the
+      # locale folder deliver reads.
+      - name: Render
+        if: steps.want.outputs.run == 'true'
+        uses: ./.github/actions/moksha-render
+        with:
+          job: ${{ runner.temp }}/job.json
+          destination: build/rendered/${{ matrix.family }}
+
+      - name: Place for deliver
+        if: steps.want.outputs.run == 'true'
+        run: |
+          set -euo pipefail
+          dest="ios/fastlane/screenshots/framed/${{ inputs.locale }}"
+          mkdir -p "$dest"
+          # Replace only this family's images, prefixed so they never collide.
+          rm -f "$dest"/${{ matrix.family }}_*.png
+          for f in build/rendered/${{ matrix.family }}/*.png; do
+            cp "$f" "$dest/${{ matrix.family }}_$(basename "$f")"
+          done
+          ls -la "$dest"
+
+      - name: Open a PR
+        if: steps.want.outputs.run == 'true'
+        uses: ./.github/actions/open-screenshot-pr
+        with:
+          paths: ios/fastlane/screenshots
+          title: "chore: refresh App Store ${{ matrix.family }} screenshots (${{ inputs.locale }})"
+          branch: screenshots/appstore-${{ matrix.family }}-${{ inputs.locale }}
+
+      - name: Shut the simulator down
+        if: always() && steps.want.outputs.run == 'true'
+        run: xcrun simctl delete ${{ steps.sim.outputs.udid }} || true
+
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.want.outputs.run == 'true'
+        with:
+          name: appstore-${{ matrix.family }}-${{ inputs.locale }}
+          path: |
+            build/screenshots/
+            build/rendered/${{ matrix.family }}/
+          if-no-files-found: warn

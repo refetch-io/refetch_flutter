@@ -1,0 +1,100 @@
+# Capture, frame and open a PR with the Play store phone screenshots.
+#
+# Manual only: it rewrites listing images, so it runs when you decide the
+# listing needs refreshing. Ported from momo-pasal; see screenshots/README.md.
+#
+# Ubuntu, not macOS: the emulator action's own guidance is that Ubuntu runners
+# with KVM are 2-3x faster and much cheaper.
+#
+# The capture reads the live feed from Appwrite, so the shots show real
+# stories. Analytics is compiled out (ANALYTICS_PROPERTY_ID empty) so these
+# runs never land in the app's stats.
+
+name: Screenshots (Android)
+
+on:
+  workflow_dispatch:
+    inputs:
+      locale:
+        description: "Play listing locale"
+        type: choice
+        default: en-US
+        options:
+          - en-US
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  screenshots:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.1"
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Capture
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: |
+            flutter drive \
+              --driver=test_driver/integration_test.dart \
+              --target=integration_test/screenshot_test.dart \
+              --dart-define=ANALYTICS_PROPERTY_ID= \
+              -d emulator-5554
+
+      - name: Build the moksha job
+        run: |
+          dart run tool/screenshot_job.dart \
+            --asset-type android-phone-screenshot \
+            --size-id android-phone \
+            --locale ${{ inputs.locale }} \
+            --out "$RUNNER_TEMP/job.json"
+
+      - name: Render
+        uses: ./.github/actions/moksha-render
+        with:
+          job: ${{ runner.temp }}/job.json
+          destination: android/fastlane/metadata/android/${{ inputs.locale }}/images/phoneScreenshots
+
+      - name: Open a PR
+        uses: ./.github/actions/open-screenshot-pr
+        with:
+          paths: android/fastlane/metadata
+          title: "chore: refresh Play phone screenshots (${{ inputs.locale }})"
+          branch: screenshots/play-phone-${{ inputs.locale }}
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: play-phone-${{ inputs.locale }}
+          path: |
+            build/screenshots/
+            android/fastlane/metadata/android/${{ inputs.locale }}/images/phoneScreenshots/
+          if-no-files-found: warn
