@@ -1,1 +1,4 @@
-Initial release of Refetch: a curated tech-news feed with discussions, voting, submissions, and push notifications — for mobile and desktop.
+A fresh look to match refetch.io: the new logo, colours and type, in light and dark.
+Stories load from the new Refetch, so the feed, threads, votes and comments work again.
+Share any story from the feed or its thread.
+Anonymous usage analytics, which you can turn off in Account.

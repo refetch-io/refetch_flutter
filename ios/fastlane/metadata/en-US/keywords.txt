@@ -1,1 +1,1 @@
-tech news,hacker news,programming,developer,startups,open source,security,HN,community
+tech news,hacker news,programming,developer,startups,open source,builders,AI,HN

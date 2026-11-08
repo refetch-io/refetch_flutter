@@ -1,7 +1,7 @@
 name: refetch
 description: "Refetch: the front page for builders. Open-source alternative to YC-controlled HN."
 publish_to: 'none'
-version: 0.1.0+5
+version: 0.2.0+6
 
 environment:
   sdk: ^3.12.0
