@@ -11,8 +11,8 @@ import 'api_exception.dart';
 /// see the web repo's `docs/APP_API.md`).
 ///
 /// Handles JSON encoding/decoding, unwrapping the `{ "data": … }` envelope,
-/// error mapping to [ApiException], and injecting the cached Appwrite JWT as a
-/// Bearer token on authenticated calls.
+/// error mapping to [ApiException], and sending the cached Appwrite JWT in the
+/// `X-Refetch-JWT` header on authenticated calls.
 class ApiClient {
   ApiClient({
     required this.baseUrl,
@@ -88,7 +88,9 @@ class ApiClient {
       if (token == null) {
         throw const ApiException(401, 'You need to sign in to do that.');
       }
-      headers['authorization'] = 'Bearer $token';
+      // Not `Authorization`: Appwrite Cloud's edge executor overwrites that
+      // header before the request reaches refetch.io (docs/APP_API.md).
+      headers['x-refetch-jwt'] = token;
     }
     return headers;
   }

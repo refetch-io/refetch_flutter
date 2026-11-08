@@ -140,4 +140,26 @@ void main() {
       ),
     );
   });
+
+  // Appwrite Cloud's edge executor overwrites Authorization before the request
+  // reaches refetch.io, so the JWT must travel in X-Refetch-JWT.
+  test('sends the JWT in X-Refetch-JWT, not Authorization', () async {
+    Map<String, String>? sent;
+    when(
+      () => httpClient.post(
+        any(),
+        headers: any(named: 'headers'),
+        body: any(named: 'body'),
+        encoding: any(named: 'encoding'),
+      ),
+    ).thenAnswer((invocation) async {
+      sent = invocation.namedArguments[#headers] as Map<String, String>;
+      return http.Response('{"data":{}}', 200);
+    });
+
+    await api.post('/api/app/session');
+
+    expect(sent?['x-refetch-jwt'], 't');
+    expect(sent?.containsKey('authorization'), isFalse);
+  });
 }
