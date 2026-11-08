@@ -35,6 +35,7 @@ on:
           - beta     # TestFlight
           - release  # App Store review
           - build    # signed IPA only, no upload
+          - upload_listing  # App Store text + screenshots only, no build
       build_number:
         description: "Override the build number (TestFlight rejects a re-upload at the same one). Blank uses pubspec.yaml."
         required: false
@@ -106,6 +107,7 @@ jobs:
       # Generates Runner.xcworkspace and installs the pods that fastlane's
       # build_app then archives with the match-provisioned signing identity.
       - name: Build Flutter iOS
+        if: inputs.release_type != 'upload_listing'
         run: |
           if [ -n "${{ inputs.build_number }}" ]; then
             flutter build ios --release --no-codesign --build-number="${{ inputs.build_number }}"
@@ -118,7 +120,7 @@ jobs:
         run: bundle exec fastlane ${{ inputs.release_type }}
 
       - name: Upload IPA artifact
-        if: success()
+        if: success() && inputs.release_type != 'upload_listing'
         uses: actions/upload-artifact@v4
         with:
           name: refetch-ios-${{ inputs.release_type }}
