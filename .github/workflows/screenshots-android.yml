@@ -62,12 +62,9 @@ jobs:
           arch: x86_64
           profile: pixel_6
           disable-animations: true
-          script: |
-            flutter drive \
-              --driver=test_driver/integration_test.dart \
-              --target=integration_test/screenshot_test.dart \
-              --dart-define=ANALYTICS_PROPERTY_ID= \
-              -d emulator-5554
+          # One line: the action runs each script line as its own shell command,
+          # so a backslash-continued command falls apart.
+          script: flutter drive --driver=test_driver/integration_test.dart --target=integration_test/screenshot_test.dart --dart-define=ANALYTICS_PROPERTY_ID= -d emulator-5554
 
       - name: Build the moksha job
         run: |
