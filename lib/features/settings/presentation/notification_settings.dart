@@ -64,7 +64,9 @@ class _NotificationSettingsState extends ConsumerState<NotificationSettings> {
     final messenger = ScaffoldMessenger.of(context);
     try {
       if (value && !_permissionGranted) await _grantPermission();
-      await ref.read(topicSubscriptionsProvider).setEnabled(topic, value);
+      await ref
+          .read(pushNotificationServiceProvider)
+          .setTopicEnabled(topic, value);
       ref
           .read(analyticsProvider)
           .track(

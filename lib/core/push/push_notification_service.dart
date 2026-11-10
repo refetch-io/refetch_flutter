@@ -7,7 +7,9 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:push/push.dart';
 
 import '../config/app_config.dart';
+import 'appwrite_push_channel.dart';
 import 'push_registrar.dart';
+import 'push_topic.dart';
 import 'topic_subscriptions.dart';
 
 /// Top-level background-message handler. The OS displays notification-type
@@ -17,22 +19,30 @@ Future<void> onBackgroundPushMessage(RemoteMessage message) async {
   // No work needed in the background isolate.
 }
 
-/// Bridges device push notifications into the app using the `push` plugin,
-/// which talks to FCM on Android and **APNS directly on iOS (no Firebase)**.
+/// Device push, on the transport Appwrite recommends for each platform:
 ///
-/// The device token is registered against the matching Appwrite Messaging
-/// provider — the FCM token → FCM provider on Android, the APNS token → APNS
-/// provider on iOS. All plugin access is guarded so the app runs normally on
-/// platforms where push is unavailable (desktop) or unconfigured.
+///  * **Android: Appwrite Push** ([AppwritePushChannel]), Appwrite's own
+///    provider over its MQTT broker. No Firebase.
+///  * **iOS: APNs** through the `push` plugin, with the APNs token registered
+///    against the APNs provider. Appwrite Push on Flutter iOS only reaches a
+///    running app, so APNs stays for delivery while it is suspended.
+///
+/// All plugin access is guarded so the app runs normally on platforms where
+/// push is unavailable (desktop) or unconfigured.
 class PushNotificationService {
   PushNotificationService(
     this._registrar,
     this._topics, {
+    AppwritePushChannel? appwritePush,
     FlutterLocalNotificationsPlugin? localNotifications,
-  }) : _local = localNotifications ?? FlutterLocalNotificationsPlugin();
+  }) : _appwrite = appwritePush,
+       _local = localNotifications ?? FlutterLocalNotificationsPlugin();
 
   final PushRegistrar _registrar;
   final TopicSubscriptions _topics;
+
+  /// Set on Android only; null means the APNs path.
+  final AppwritePushChannel? _appwrite;
   final FlutterLocalNotificationsPlugin _local;
 
   bool _available = false;
@@ -54,11 +64,29 @@ class PushNotificationService {
     _initialized = true;
     _onOpenThread = onOpenThread;
 
+    final appwrite = _appwrite;
+    if (appwrite != null) {
+      try {
+        await appwrite.start(onOpenThread: onOpenThread);
+        _available = true;
+      } catch (error) {
+        debugPrint('Appwrite Push unavailable: $error');
+        return;
+      }
+      if (_signedIn) {
+        await requestPermission();
+        await appwrite.onSignedIn();
+      }
+      return;
+    }
+
     try {
       await _setUpLocalNotifications();
 
       _unsubscribes.add(Push.instance.addOnMessage(_showForeground));
-      _unsubscribes.add(Push.instance.addOnBackgroundMessage(onBackgroundPushMessage));
+      _unsubscribes.add(
+        Push.instance.addOnBackgroundMessage(onBackgroundPushMessage),
+      );
       _unsubscribes.add(Push.instance.addOnNotificationTap(_handleTapData));
       _unsubscribes.add(
         Push.instance.addOnNewToken((token) {
@@ -96,6 +124,13 @@ class PushNotificationService {
   /// available now, otherwise defers until [initialize] completes.
   Future<void> onSignedIn() async {
     _signedIn = true;
+    final appwrite = _appwrite;
+    if (appwrite != null) {
+      if (!_available) return; // initialize() picks it up.
+      await requestPermission();
+      await appwrite.onSignedIn();
+      return;
+    }
     await _registerIfPossible();
   }
 
@@ -103,7 +138,19 @@ class PushNotificationService {
   Future<void> onSignedOut() async {
     _signedIn = false;
     _registering = false;
+    final appwrite = _appwrite;
+    if (appwrite != null) {
+      await appwrite.onSignedOut();
+      return;
+    }
     await _registrar.unregister();
+  }
+
+  /// Turns a notification topic on or off: the Messaging subscriber for this
+  /// device's target, and on Android the live Appwrite Push subscription.
+  Future<void> setTopicEnabled(PushTopic topic, bool enabled) async {
+    await _topics.setEnabled(topic, enabled);
+    await _appwrite?.applyTopic(topic, enabled);
   }
 
   /// Registers the current device token against the matching Appwrite provider.
@@ -129,12 +176,8 @@ class PushNotificationService {
     }
   }
 
-  /// FCM provider on Android, APNS provider on iOS.
-  String _providerId() {
-    return defaultTargetPlatform == TargetPlatform.iOS
-        ? AppConfig.apnsProviderId
-        : AppConfig.fcmProviderId;
-  }
+  /// The `push` plugin path is iOS-only, so its tokens are APNs tokens.
+  String _providerId() => AppConfig.apnsProviderId;
 
   Future<void> _setUpLocalNotifications() async {
     const androidChannel = AndroidNotificationChannel(
@@ -210,6 +253,7 @@ class PushNotificationService {
   }
 
   void dispose() {
+    _appwrite?.dispose();
     for (final unsubscribe in _unsubscribes) {
       unsubscribe();
     }

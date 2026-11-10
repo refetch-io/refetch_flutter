@@ -12,7 +12,11 @@ class VoteState {
   bool get isUp => currentVote == 'up';
   bool get isDown => currentVote == 'down';
 
-  VoteState copyWith({int? count, String? currentVote, bool clearVote = false}) {
+  VoteState copyWith({
+    int? count,
+    String? currentVote,
+    bool clearVote = false,
+  }) {
     return VoteState(
       count: count ?? this.count,
       currentVote: clearVote ? null : (currentVote ?? this.currentVote),

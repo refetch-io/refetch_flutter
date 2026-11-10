@@ -1,16 +1,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- appwrite >= 28 ships its own background push (MQTT foreground service,
-         flutter_background_service, boot receivers). Refetch delivers push
-         through FCM with the `push` plugin and never starts any of these, so
-         they are removed: a remoteMessaging foreground service would need a
-         Play Console foreground-service declaration, and the boot receivers
-         would wake the app at every reboot for nothing. The appwrite manifest
-         documents this removal for apps that do not use Push.setForeground. -->
+    <!-- Push on Android is Appwrite Push (docs/PUSH.md). The appwrite SDK's
+         scheduled delivery (job, alarm and boot receivers) stays. Refetch
+         never calls Push.setForeground, so the remoteMessaging foreground
+         service and its permissions are removed, as the appwrite manifest
+         documents; kept, Play would ask for a foreground-service
+         declaration. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" tools:node="remove" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_REMOTE_MESSAGING" tools:node="remove" />
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" tools:node="remove" />
 
     <application
         android:label="Refetch"
@@ -43,15 +41,25 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
-        <!-- See the note at the top: appwrite's unused background push. -->
+        <!-- Small icon for Appwrite Push notifications (white mask). -->
+        <meta-data
+            android:name="io.appwrite.flutter.push.notification_icon"
+            android:resource="@drawable/ic_launcher_monochrome" />
+        <!-- See the note at the top. The foreground service, and
+             flutter_background_service, which the SDK only uses off Android. -->
         <service android:name="io.appwrite.flutter.services.PushService" tools:node="remove" />
-        <service android:name="io.appwrite.flutter.services.PushJobService" tools:node="remove" />
-        <receiver android:name="io.appwrite.flutter.services.PushAlarmReceiver" tools:node="remove" />
-        <receiver android:name="io.appwrite.flutter.services.PushBootReceiver" tools:node="remove" />
-        <activity android:name="io.appwrite.flutter.services.PushOpenActivity" tools:node="remove" />
         <service android:name="id.flutter.flutter_background_service.BackgroundService" tools:node="remove" />
         <receiver android:name="id.flutter.flutter_background_service.WatchdogReceiver" tools:node="remove" />
         <receiver android:name="id.flutter.flutter_background_service.BootReceiver" tools:node="remove" />
+        <!-- The `push` plugin is iOS-only here (APNs); drop its FCM pieces. -->
+        <receiver android:name="uk.orth.push.FirebaseMessagingReceiver" tools:node="remove" />
+        <service android:name="uk.orth.push.MessagingService" tools:node="remove" />
+        <receiver android:name="com.google.firebase.iid.FirebaseInstanceIdReceiver" tools:node="remove" />
+        <service android:name="com.google.firebase.messaging.FirebaseMessagingService" tools:node="remove" />
+        <provider
+            android:name="com.google.firebase.provider.FirebaseInitProvider"
+            android:authorities="${applicationId}.firebaseinitprovider"
+            tools:node="remove" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

@@ -66,6 +66,7 @@ app.*.map.json
 # except the brand sources the app's look is built from.
 docs/*
 !docs/BRANDING.md
+!docs/PUSH.md
 
 # Fastlane — generated docs, run reports and locally installed gems.
 **/fastlane/README.md

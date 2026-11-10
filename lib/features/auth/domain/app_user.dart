@@ -13,10 +13,6 @@ class AppUser {
       name.trim().isNotEmpty ? name : email.split('@').first;
 
   factory AppUser.fromAccount(models.User account) {
-    return AppUser(
-      id: account.$id,
-      name: account.name,
-      email: account.email,
-    );
+    return AppUser(id: account.$id, name: account.name, email: account.email);
   }
 }

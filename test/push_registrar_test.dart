@@ -38,10 +38,12 @@ void main() {
 
     expect(id, 't-new');
     expect(await store.read(), 't-new');
-    verifyNever(() => account.updatePushTarget(
-          targetId: any(named: 'targetId'),
-          identifier: any(named: 'identifier'),
-        ));
+    verifyNever(
+      () => account.updatePushTarget(
+        targetId: any(named: 'targetId'),
+        identifier: any(named: 'identifier'),
+      ),
+    );
   });
 
   test('subsequent registration updates the existing target', () async {
@@ -57,11 +59,13 @@ void main() {
     final id = await registrar.register('refreshed-token');
 
     expect(id, 't-existing');
-    verifyNever(() => account.createPushTarget(
-          targetId: any(named: 'targetId'),
-          identifier: any(named: 'identifier'),
-          providerId: any(named: 'providerId'),
-        ));
+    verifyNever(
+      () => account.createPushTarget(
+        targetId: any(named: 'targetId'),
+        identifier: any(named: 'identifier'),
+        providerId: any(named: 'providerId'),
+      ),
+    );
   });
 
   test('empty token is a no-op', () async {
@@ -91,8 +95,9 @@ void main() {
     // What shipped in build 1: a target created before the APNS provider
     // existed, so it carries no provider and delivers through the wrong one.
     final store = InMemoryPushTargetStore('t-no-provider');
-    when(() => account.deletePushTarget(targetId: 't-no-provider'))
-        .thenAnswer((_) async => {});
+    when(
+      () => account.deletePushTarget(targetId: 't-no-provider'),
+    ).thenAnswer((_) async => {});
     when(
       () => account.createPushTarget(
         targetId: any(named: 'targetId'),
@@ -108,10 +113,12 @@ void main() {
     expect(await store.read(), 't-apns');
     expect(await store.readProviderId(), 'apns');
     verify(() => account.deletePushTarget(targetId: 't-no-provider')).called(1);
-    verifyNever(() => account.updatePushTarget(
-          targetId: any(named: 'targetId'),
-          identifier: any(named: 'identifier'),
-        ));
+    verifyNever(
+      () => account.updatePushTarget(
+        targetId: any(named: 'targetId'),
+        identifier: any(named: 'identifier'),
+      ),
+    );
   });
 
   test('a target on the same provider is still updated in place', () async {
@@ -127,13 +134,16 @@ void main() {
     final id = await registrar.register('refreshed', providerId: 'fcm');
 
     expect(id, 't-fcm');
-    verifyNever(() => account.deletePushTarget(targetId: any(named: 'targetId')));
+    verifyNever(
+      () => account.deletePushTarget(targetId: any(named: 'targetId')),
+    );
   });
 
   test('unregister deletes the target and clears the store', () async {
     final store = InMemoryPushTargetStore('t-1');
-    when(() => account.deletePushTarget(targetId: 't-1'))
-        .thenAnswer((_) async => {});
+    when(
+      () => account.deletePushTarget(targetId: 't-1'),
+    ).thenAnswer((_) async => {});
 
     final registrar = PushRegistrar(account, store);
     await registrar.unregister();
