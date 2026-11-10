@@ -1,0 +1,1 @@
+Notifications on Android now come straight from Refetch through Appwrite, without Google Firebase.

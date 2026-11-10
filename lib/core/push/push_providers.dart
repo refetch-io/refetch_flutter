@@ -1,7 +1,9 @@
 import 'package:appwrite/appwrite.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../appwrite/appwrite_providers.dart';
+import 'appwrite_push_channel.dart';
 import 'push_notification_service.dart';
 import 'push_registrar.dart';
 import 'push_target_store.dart';
@@ -38,9 +40,21 @@ final topicSubscriptionsProvider = Provider<TopicSubscriptions>((ref) {
 final pushNotificationServiceProvider = Provider<PushNotificationService>((
   ref,
 ) {
+  final registrar = ref.watch(pushRegistrarProvider);
+  final topics = ref.watch(topicSubscriptionsProvider);
+  final client = ref.watch(appwriteClientProvider);
+  final isAndroid = !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
   final service = PushNotificationService(
-    ref.watch(pushRegistrarProvider),
-    ref.watch(topicSubscriptionsProvider),
+    registrar,
+    topics,
+    // Android: Appwrite Push. iOS: APNs through the `push` plugin.
+    appwritePush: isAndroid
+        ? AppwritePushChannel(
+            registrar,
+            topics,
+            push: () => SdkLivePush(client),
+          )
+        : null,
   );
   ref.onDispose(service.dispose);
   return service;

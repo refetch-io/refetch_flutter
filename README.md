@@ -35,8 +35,9 @@ web app:
   [`docs/APP_API.md`](https://github.com/refetch-io/refetch/blob/main/docs/APP_API.md)
   in the web repo.
 - **Auth** is the Appwrite Dart SDK (email/password sessions).
-- **Push** uses FCM on Android and APNS directly on iOS (no Firebase on iOS)
-  via the [`push`](https://pub.dev/packages/push) plugin.
+- **Push** is Appwrite Push (Appwrite's own provider, no Firebase) on Android
+  and APNs through the [`push`](https://pub.dev/packages/push) plugin on iOS.
+  See [`docs/PUSH.md`](docs/PUSH.md).
 - **Analytics** is Appwrite Analytics, behind `AnalyticsService`
   (`lib/core/analytics/`). Events are anonymous, carry no user id or text the
   person wrote, and stop when the switch in Account › Privacy is off. The

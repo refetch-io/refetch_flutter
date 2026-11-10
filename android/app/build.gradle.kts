@@ -7,12 +7,6 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
-// Enable FCM only when google-services.json is present (it is gitignored, so
-// open-source clones without it still build — push is simply disabled there).
-if (file("google-services.json").exists()) {
-    apply(plugin = "com.google.gms.google-services")
-}
-
 // Release signing config, loaded from android/key.properties (gitignored).
 // Falls back to debug signing when the file is absent (e.g. fresh checkout).
 val keystoreProperties = Properties()

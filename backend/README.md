@@ -21,14 +21,14 @@ Topic **subscription** is handled client-side by the app via the Appwrite
 
 ## Transport
 
-Two Appwrite Messaging providers deliver **directly** to each platform:
+Two Appwrite Messaging providers deliver to the app (see `../docs/PUSH.md`):
 
-- **FCM provider** → Android (device registers its FCM token).
+- **Appwrite Push provider** → Android, over Appwrite's own broker (no FCM).
 - **APNS provider** → iOS (device registers its APNS token; upload your APNS
   `.p8` auth key to the Appwrite APNS provider).
 
 `messaging.createPush` targets users (`notify-*`) or a topic (`weekly-digest`); Appwrite
-routes each target to the provider matching its platform.
+routes each user's messages to the right provider.
 
 ## Shared env (set on every function)
 

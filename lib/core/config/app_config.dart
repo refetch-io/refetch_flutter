@@ -45,13 +45,16 @@ class AppConfig {
   static const String digestTopicId = 'weekly-digest';
   static const String repliesTopicId = 'replies';
 
-  /// Appwrite Messaging provider ids. Android registers its FCM token against
-  /// the FCM provider; iOS registers its APNS token against the APNS provider —
-  /// each provider delivers directly to its platform (no FCM→APNS relay). If
-  /// either is left empty, Appwrite falls back to picking a provider by the
-  /// target's platform, which fails silently when none is configured.
-  static const String fcmProviderId = '6a1bb5a3001dc2d85de3';
+  /// Appwrite Messaging provider ids. Every target names its provider: without
+  /// one, Appwrite assigns any enabled push provider, possibly the wrong one.
+  ///
+  /// iOS registers its APNs token against the APNs provider, as Appwrite
+  /// recommends for Flutter on iOS (its own push only reaches a running app).
   static const String apnsProviderId = '6a8a7cc54e645db3829c';
+
+  /// Appwrite Push, Appwrite's own provider (an MQTT broker the SDK connects
+  /// to): Android delivery, with no Firebase. See docs/PUSH.md.
+  static const String appwritePushProviderId = '6af28d0b00167c6b3005';
 
   /// Android notification channel used for foreground display.
   static const String androidNotificationChannelId = 'refetch_default';

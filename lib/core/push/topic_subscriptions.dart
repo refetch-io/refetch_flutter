@@ -28,6 +28,9 @@ class TopicSubscriptions {
     }
   }
 
+  /// The user's saved choice for [topic] (default on).
+  Future<bool> isEnabled(PushTopic topic) => _prefs.isEnabled(topic);
+
   /// Applies saved preferences to a freshly-registered [targetId]. Best-effort:
   /// a failure on one topic does not block the others.
   Future<void> syncOnRegister(String targetId) async {
