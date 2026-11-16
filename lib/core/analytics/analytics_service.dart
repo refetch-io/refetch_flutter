@@ -8,7 +8,8 @@
 ///  * ids of public stories are fine — they are public anyway;
 ///  * nothing is sent while the user has analytics turned off.
 abstract interface class AnalyticsService {
-  /// Begin automatic events (app foregrounded/backgrounded).
+  /// Begin automatic events (app foregrounded/backgrounded, first open, app
+  /// updated).
   void start();
 
   /// Stop automatic events. Explicit calls after this are dropped too.

@@ -27,8 +27,11 @@ class AppwriteAnalyticsService implements AnalyticsService {
 
   final Tracking _tracking;
 
+  /// Lifecycle events plus `first_open` (once per install) and `app_updated`
+  /// (first start after a version change); the SDK runs that check once per
+  /// process, so turning analytics back on does not resend them.
   @override
-  void start() => _tracking.enableAutoLifecycleEvents();
+  void start() => _tracking.start();
 
   @override
   void stop() => _tracking.disableAutoLifecycleEvents();
