@@ -1,0 +1,1 @@
+Behind-the-scenes update to the Appwrite SDK, so anonymous usage stats now count installs and updates.
