@@ -2,7 +2,10 @@ import 'package:appwrite/appwrite.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../analytics/analytics_providers.dart';
+import '../analytics/appwrite_analytics.dart';
 import '../appwrite/appwrite_providers.dart';
+import '../config/app_config.dart';
 import 'appwrite_push_channel.dart';
 import 'push_notification_service.dart';
 import 'push_registrar.dart';
@@ -43,6 +46,7 @@ final pushNotificationServiceProvider = Provider<PushNotificationService>((
   final registrar = ref.watch(pushRegistrarProvider);
   final topics = ref.watch(topicSubscriptionsProvider);
   final client = ref.watch(appwriteClientProvider);
+  final analytics = ref.watch(analyticsProvider);
   final isAndroid = !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
   final service = PushNotificationService(
     registrar,
@@ -52,9 +56,17 @@ final pushNotificationServiceProvider = Provider<PushNotificationService>((
         ? AppwritePushChannel(
             registrar,
             topics,
-            push: () => SdkLivePush(client),
+            push: () => SdkLivePush(
+              client,
+              tracking: PushTracking(
+                analytics,
+                client,
+                AppConfig.analyticsPropertyId,
+              ),
+            ),
           )
         : null,
+    analytics: analytics,
   );
   ref.onDispose(service.dispose);
   return service;

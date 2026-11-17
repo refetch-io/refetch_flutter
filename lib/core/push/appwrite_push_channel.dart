@@ -27,7 +27,10 @@ abstract class LivePush {
 
 /// [LivePush] over the SDK's [Push].
 class SdkLivePush implements LivePush {
-  SdkLivePush(Client client) : _push = Push(client);
+  /// [tracking], when set, receives `push_received` / `push_opened`.
+  SdkLivePush(Client client, {Tracking? tracking}) : _push = Push(client) {
+    if (tracking != null) _push.setTracking(tracking);
+  }
 
   final Push _push;
 
