@@ -6,6 +6,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:push/push.dart';
 
+import '../analytics/analytics_service.dart';
 import '../config/app_config.dart';
 import 'appwrite_push_channel.dart';
 import 'push_registrar.dart';
@@ -35,6 +36,7 @@ class PushNotificationService {
     this._topics, {
     AppwritePushChannel? appwritePush,
     FlutterLocalNotificationsPlugin? localNotifications,
+    this._analytics = const NoopAnalytics(),
   }) : _appwrite = appwritePush,
        _local = localNotifications ?? FlutterLocalNotificationsPlugin();
 
@@ -44,6 +46,10 @@ class PushNotificationService {
   /// Set on Android only; null means the APNs path.
   final AppwritePushChannel? _appwrite;
   final FlutterLocalNotificationsPlugin _local;
+
+  /// APNs path only: Appwrite Push reports its own push events through the
+  /// SDK (`Push.setTracking`).
+  final AnalyticsService _analytics;
 
   bool _available = false;
   bool _initialized = false;
@@ -207,6 +213,7 @@ class PushNotificationService {
   void _showForeground(RemoteMessage message) {
     final notification = message.notification;
     if (notification == null) return;
+    _analytics.pushReceived(messageId: _messageId(message.data));
 
     _local.show(
       id: notification.hashCode,
@@ -226,6 +233,7 @@ class PushNotificationService {
   }
 
   void _handleTapData(Map<String?, Object?> data) {
+    _analytics.pushOpened(messageId: _messageId(data));
     final postId = data['postId'];
     if (postId is String && postId.isNotEmpty) {
       _onOpenThread?.call(postId);
@@ -235,6 +243,7 @@ class PushNotificationService {
   void _openFromPayload(String payload) {
     try {
       final data = jsonDecode(payload);
+      _analytics.pushOpened(messageId: data is Map ? _messageId(data) : null);
       final postId = data is Map ? data['postId'] : null;
       if (postId is String && postId.isNotEmpty) {
         _onOpenThread?.call(postId);
@@ -242,6 +251,12 @@ class PushNotificationService {
     } catch (_) {
       // Malformed payload — ignore.
     }
+  }
+
+  /// The Appwrite Messaging message id, when the payload carries one.
+  String? _messageId(Map<Object?, Object?>? data) {
+    final id = data?['messageId'];
+    return id is String && id.isNotEmpty ? id : null;
   }
 
   Map<String, Object?> _stringKeyed(Map<String?, Object?>? data) {

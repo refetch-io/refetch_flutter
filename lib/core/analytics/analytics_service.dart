@@ -20,6 +20,13 @@ abstract interface class AnalyticsService {
 
   /// A custom event. Names are `snake_case` (see [AnalyticsEvents]).
   void track(String name, {Map<String, Object?>? props});
+
+  /// A push notification arrived while the app was running (`push_received`,
+  /// non-interactive). [messageId] is the Appwrite Messaging message id.
+  void pushReceived({String? messageId});
+
+  /// The user tapped a push notification (`push_opened`).
+  void pushOpened({String? messageId});
 }
 
 /// Event names, kept stable so their history stays comparable.
@@ -55,6 +62,12 @@ class NoopAnalytics implements AnalyticsService {
 
   @override
   void track(String name, {Map<String, Object?>? props}) {}
+
+  @override
+  void pushReceived({String? messageId}) {}
+
+  @override
+  void pushOpened({String? messageId}) {}
 }
 
 /// Forwards to [delegate] only while the user allows analytics.
@@ -121,6 +134,14 @@ class ConsentedAnalytics implements AnalyticsService {
   @override
   void track(String name, {Map<String, Object?>? props}) =>
       _send(() => delegate.track(name, props: props));
+
+  @override
+  void pushReceived({String? messageId}) =>
+      _send(() => delegate.pushReceived(messageId: messageId));
+
+  @override
+  void pushOpened({String? messageId}) =>
+      _send(() => delegate.pushOpened(messageId: messageId));
 }
 
 /// Props as the endpoint wants them: non-null values only, at most

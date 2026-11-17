@@ -46,6 +46,33 @@ class AppwriteAnalyticsService implements AnalyticsService {
   void track(String name, {Map<String, Object?>? props}) {
     _tracking.event(name, props: cleanProps(props, maxPairs: 16));
   }
+
+  @override
+  void pushReceived({String? messageId}) =>
+      _tracking.pushReceived(messageId: messageId);
+
+  @override
+  void pushOpened({String? messageId}) =>
+      _tracking.pushOpened(messageId: messageId);
+}
+
+/// The [Tracking] handed to [Push.setTracking], so the SDK reports
+/// `push_received` / `push_opened` (deduplicated, with the `messageId`) but
+/// through [AnalyticsService]: the user's analytics choice still applies.
+/// Only the push hooks are used; nothing else is sent from this instance.
+class PushTracking extends Tracking {
+  PushTracking(this._analytics, Client client, String propertyId)
+    : super(Analytics(client), propertyId);
+
+  final AnalyticsService _analytics;
+
+  @override
+  void pushReceived({String? messageId, String? campaign}) =>
+      _analytics.pushReceived(messageId: messageId);
+
+  @override
+  void pushOpened({String? messageId, String? campaign}) =>
+      _analytics.pushOpened(messageId: messageId);
 }
 
 /// Debug builds only: logs each event and what the server answered, since
