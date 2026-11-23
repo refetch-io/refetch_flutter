@@ -61,6 +61,12 @@ class _SpyService implements AnalyticsService {
   @override
   void track(String name, {Map<String, Object?>? props}) =>
       calls.add('track:$name${props == null ? '' : ' $props'}');
+
+  @override
+  void pushReceived({String? messageId}) => calls.add('received:$messageId');
+
+  @override
+  void pushOpened({String? messageId}) => calls.add('opened:$messageId');
 }
 
 void main() {
@@ -121,6 +127,37 @@ void main() {
         expect(analytics.events, hasLength(1), reason: 'nothing after stop');
       },
     );
+
+    test(
+      'push events carry the message id; received is non-interactive',
+      () async {
+        service.pushReceived(messageId: 'm1');
+        service.pushOpened(messageId: 'm1');
+        await Future<void>.delayed(Duration.zero);
+
+        expect(analytics.events.map((e) => e['name']), [
+          'push_received',
+          'push_opened',
+        ]);
+        expect(analytics.events.first['interactive'], isFalse);
+        expect(analytics.events.last['interactive'], isTrue);
+        expect(analytics.events.first['props'], ['messageId', 'm1']);
+      },
+    );
+  });
+
+  test('PushTracking routes the SDK push hooks through consent', () {
+    final spy = _SpyService();
+    final analytics = ConsentedAnalytics(spy, enabled: false);
+    final tracking = PushTracking(analytics, _FakeClient(), 'prop-123');
+
+    tracking.pushReceived(messageId: 'm1');
+    expect(spy.calls, isEmpty, reason: 'analytics is off');
+
+    analytics.enabled = true;
+    tracking.pushReceived(messageId: 'm2');
+    tracking.pushOpened(messageId: 'm2');
+    expect(spy.calls, ['received:m2', 'opened:m2']);
   });
 
   group('ConsentedAnalytics', () {

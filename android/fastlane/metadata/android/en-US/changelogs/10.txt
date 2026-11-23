@@ -1,0 +1,1 @@
+Fixes a problem that could stop the app from starting on some Android phones. Notification stats now follow your analytics setting.
